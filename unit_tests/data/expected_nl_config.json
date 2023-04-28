@@ -1,0 +1,136 @@
+{
+    "genesis_key":
+    "12C91837C846F875F56F67CD83040A832CFC0F131AF3DFF9E502C0D43F5D2D15",
+    "canary_key":
+    "FB4E458CB13508353C5B2574B82F1D1D61367F61E88707F773F068FF90050BEE",
+    "epoch_count": 2,
+    "burn_amount": "140282366920938463463374607431768211454",
+    "NANO_TEST_EPOCH_1": "0x000000000000000f",
+    "NANO_TEST_EPOCH_2": "0x000000000000000f",
+    "NANO_TEST_EPOCH_2_RECV": "0x000000000000000f",
+    "NANO_TEST_MAGIC_NUMBER": "LC",
+    "remote_address": "127.0.0.1",
+    "nanolooker_enable": false,
+    "nanolooker_port": 42000,
+    "nanolooker_node_name": "genesis",
+    "nanolooker_mongo_port": 27017,
+    "representatives": {
+        "node_prefix":
+        "unittest",
+        "host_port_peer":
+        44000,
+        "host_port_rpc":
+        45000,
+        "host_port_ws":
+        47000,        
+        "docker_tag":
+        "nanocurrency/nano-beta:V25.0DB35",
+        "nodes": [{
+            "name": "unittest_genesis",
+            "key":
+            "12C91837C846F875F56F67CD83040A832CFC0F131AF3DFF9E502C0D43F5D2D15",
+            "is_genesis": true,
+            "host_port_peer": 44000,
+            "host_port_rpc": 45000,
+            "host_port_ws": 47000,
+            "host_ip": "127.0.0.1",
+            "rpc_url": "http://127.0.0.1:45000",
+            "ws_url": "ws://127.0.0.1:47000",
+            "account":
+            "nano_1fzwxb8tkmrp8o66xz7tcx65rm57bxdmpitw39ecomiwpjh89zxj33juzt6p",
+            "account_data": {
+                "private":
+                "12c91837c846f875f56f67cd83040a832cfc0f131af3dff9e502c0d43f5d2d15",
+                "public":
+                "37fcea4da94f1635484efcba57483c4c654f573b435c09d8aace1cb45e63ffb1",
+                "account":
+                "nano_1fzwxb8tkmrp8o66xz7tcx65rm57bxdmpitw39ecomiwpjh89zxj33juzt6p"
+            },
+            "is_pr": false
+        }, {
+            "name": "unittest_pr1",
+            "seed":
+            "1110000000000000000000000000000000000000000000000000000000000001",
+            "vote_weight_percent": 50,
+            "host_port_peer": 44001,
+            "host_port_rpc": 45001,
+            "host_port_ws": 47001,
+            "host_ip": "127.0.0.1",
+            "rpc_url": "http://127.0.0.1:45001",
+            "ws_url": "ws://127.0.0.1:47001",
+            "account":
+            "nano_1ge7edbt774uw7z8exomwiu19rd14io1nocyin5jwpiit3133p9eaaxn74ub",
+            "account_data": {
+                "private":
+                "546db5a6a45774bd849cd4289d5d89224c927b072d9825fbc86b208d69f6175d",
+                "public":
+                "398562d3a2945be17e6676b3e43603e160142a0a555e85071e5a10d04010d8ec",
+                "account":
+                "nano_1ge7edbt774uw7z8exomwiu19rd14io1nocyin5jwpiit3133p9eaaxn74ub",
+                "seed":
+                "1110000000000000000000000000000000000000000000000000000000000001",
+                "index": 0
+            },
+            "balance": 10000000000000000000000000000000000000000,
+            "is_pr": true
+        }, {
+            "name": "unittest_pr2",
+            "seed":
+            "1110000000000000000000000000000000000000000000000000000000000002",
+            "vote_weight_percent": 50,
+            "host_port_peer": 44002,
+            "host_port_rpc": 45002,
+            "host_port_ws": 47002,
+            "host_ip": "127.0.0.1",
+            "rpc_url": "http://127.0.0.1:45002",
+            "ws_url": "ws://127.0.0.1:47002",
+            "account":
+            "nano_3sz3bi6mpeg5jipr1up3hotxde6gxum8jotr55rzbu9run8e3wxjq1rod9a6",
+            "account_data": {
+                "private":
+                "fd2365357c57fda8c18d21723d8c9fab4a274069fc8c15d7db3b20cc3b28892f",
+                "public":
+                "e7e14c093b31c38c2d806ec17d75d5b08eeee668d75818f1f4ecf8dd0cc0f3b1",
+                "account":
+                "nano_3sz3bi6mpeg5jipr1up3hotxde6gxum8jotr55rzbu9run8e3wxjq1rod9a6",
+                "seed":
+                "1110000000000000000000000000000000000000000000000000000000000002",
+                "index": 0
+            },
+            "balance": 10000000000000000000000000000000000000000,
+            "is_pr": true
+        }]
+    },
+    "env": "local",
+    "NANO_TEST_CANARY_PUB":
+    "CCAB949948224D6B33ACE0E078F7B2D3F4D79DF945E46915C5300DAEF237934E",
+    "nanomonitor_enable": false,
+    "nanoticker_enable": false,
+    "nanovotevisu_enable": false,
+    "promexporter_enable": false,
+    "prom_gateway": false,
+    "prom_runid": "default",
+    "tc_enable": false,
+    "tcpdump_enable": false,
+    
+    "burn_account_data": {
+        "account":
+        "nano_1111111111111111111111111111111111111111111111111111hifc8npp"
+    },
+    "genesis_account_data": {
+        "private":
+        "12c91837c846f875f56f67cd83040a832cfc0f131af3dff9e502c0d43f5d2d15",
+        "public":
+        "37fcea4da94f1635484efcba57483c4c654f573b435c09d8aace1cb45e63ffb1",
+        "account":
+        "nano_1fzwxb8tkmrp8o66xz7tcx65rm57bxdmpitw39ecomiwpjh89zxj33juzt6p"
+    },
+    "canary_account_data": {
+        "private":
+        "fb4e458cb13508353c5b2574b82f1d1d61367f61e88707f773f068ff90050bee",
+        "public":
+        "ccab949948224d6b33ace0e078f7b2d3f4d79df945e46915c5300daef237934e",
+        "account":
+        "nano_3m7dkkeniakffestsr91h5uu7nzntygzkjh6f6cwce1fous5h6tgpwjyhxji"
+    }
+}

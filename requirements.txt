@@ -1,0 +1,8 @@
+pyyaml
+tomli_w
+tomli
+oyaml
+nanolib
+extradict
+requests
+pytest-dependency

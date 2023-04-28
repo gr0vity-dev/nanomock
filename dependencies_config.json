@@ -1,0 +1,5 @@
+{
+    "docker": ["docker" , "--version"],
+    "docker-compose": ["docker-compose", "--version"]
+  }
+  
