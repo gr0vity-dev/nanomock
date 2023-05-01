@@ -1,0 +1,23 @@
+{
+    "frontier":
+    "E670DF81878460B76B3425EC399800E1219A4387B11A4841B16CE260A9F36917",
+    "open_block":
+    "E670DF81878460B76B3425EC399800E1219A4387B11A4841B16CE260A9F36917",
+    "representative_block":
+    "E670DF81878460B76B3425EC399800E1219A4387B11A4841B16CE260A9F36917",
+    "balance": "340282366920938463463374607431768211455",
+    "confirmed_balance": "340282366920938463463374607431768211455",
+    "block_count": "1",
+    "account_version": "0",
+    "confirmed_height": "1",
+    "confirmed_frontier":
+    "E670DF81878460B76B3425EC399800E1219A4387B11A4841B16CE260A9F36917",
+    "representative":
+    "nano_1fzwxb8tkmrp8o66xz7tcx65rm57bxdmpitw39ecomiwpjh89zxj33juzt6p",
+    "confirmed_representative":
+    "nano_1fzwxb8tkmrp8o66xz7tcx65rm57bxdmpitw39ecomiwpjh89zxj33juzt6p",
+    "pending": "0",
+    "receivable": "0",
+    "confirmed_pending": "0",
+    "confirmed_receivable": "0"
+}

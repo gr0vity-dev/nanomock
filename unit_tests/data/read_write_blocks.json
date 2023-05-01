@@ -1,0 +1,110 @@
+{
+    "nested_rpc_block_list_in": [
+        [
+            {
+                "success": true,
+                "hash": "hash1",
+                "block": "block1",
+                "account_data": {
+                    "source_seed": "seed1"
+                }
+            },
+            {
+                "success": true,
+                "hash": "hash2",
+                "block": "block2",
+                "account_data": {
+                    "source_seed": "seed2"
+                }
+            }
+        ],
+        [
+            {
+                "success": true,
+                "hash": "hash3",
+                "block": "block3",
+                "account_data": {
+                    "source_seed": null
+                }
+            },
+            {
+                "success": true,
+                "hash": "hash4",
+                "block": "block4",
+                "account_data": {
+                    "source_seed": "seed4"
+                }
+            }
+        ]
+    ],
+    "nested_rpc_block_list_expected_output": {
+        "h": [
+            [
+                "hash1",
+                "hash2"
+            ],
+            [
+                "hash3",
+                "hash4"
+            ]
+        ],
+        "s": [
+            [
+                "seed1",
+                "seed2"
+            ],
+            [
+                "seed4"
+            ]
+        ],
+        "b": [
+            [
+                "block1",
+                "block2"
+            ],
+            [
+                "block3",
+                "block4"
+            ]
+        ]
+    },
+    "dict_rpc_block_list_in": [
+        {
+            "success": true,
+            "hash": "hash1",
+            "block": "block1",
+            "account_data": {
+                "source_seed": "seed1"
+            }
+        },
+        {
+            "success": true,
+            "hash": "hash2",
+            "block": "block2",
+            "account_data": {
+                "source_seed": "seed2"
+            }
+        },
+        {
+            "success": true,
+            "hash": "hash3",
+            "block": "block3",
+            "account_data": {
+                "source_seed": null
+            }
+        },
+        {
+            "success": true,
+            "hash": "hash4",
+            "block": "block4",
+            "account_data": {
+                "source_seed": "seed4"
+            }
+        }
+    ],
+    "dict_rpc_block_list_expected_output" : {
+        "h": [["hash1", "hash2", "hash3", "hash4"]],
+        "s": [["seed1", "seed2", "seed4"]],
+        "b": [["block1", "block2", "block3", "block4"]]
+    }
+}

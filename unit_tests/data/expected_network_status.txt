@@ -1,0 +1,4 @@
+All 3 containers online
+unittest_genesis Nano V24.0 3d8d7cb   100.00% synced | 1/1 blocks cemented
+unittest_pr1     Nano V24.0 3d8d7cb   100.00% synced | 1/1 blocks cemented
+unittest_pr2     Nano V24.0 3d8d7cb   100.00% synced | 1/1 blocks cemented

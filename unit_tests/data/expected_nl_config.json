@@ -11,31 +11,31 @@
     "NANO_TEST_MAGIC_NUMBER": "LC",
     "remote_address": "127.0.0.1",
     "nanolooker_enable": false,
-    "nanolooker_port": 42000,
+    "nanolooker_port": 42900,
     "nanolooker_node_name": "genesis",
     "nanolooker_mongo_port": 27017,
     "representatives": {
         "node_prefix":
         "unittest",
         "host_port_peer":
-        44000,
+        44900,
         "host_port_rpc":
-        45000,
+        45900,
         "host_port_ws":
-        47000,        
+        47900,        
         "docker_tag":
-        "nanocurrency/nano-beta:V25.0DB35",
+        "nanocurrency/nano:V24.0",
         "nodes": [{
             "name": "unittest_genesis",
             "key":
             "12C91837C846F875F56F67CD83040A832CFC0F131AF3DFF9E502C0D43F5D2D15",
             "is_genesis": true,
-            "host_port_peer": 44000,
-            "host_port_rpc": 45000,
-            "host_port_ws": 47000,
+            "host_port_peer": 44900,
+            "host_port_rpc": 45900,
+            "host_port_ws": 47900,
             "host_ip": "127.0.0.1",
-            "rpc_url": "http://127.0.0.1:45000",
-            "ws_url": "ws://127.0.0.1:47000",
+            "rpc_url": "http://127.0.0.1:45900",
+            "ws_url": "ws://127.0.0.1:47900",
             "account":
             "nano_1fzwxb8tkmrp8o66xz7tcx65rm57bxdmpitw39ecomiwpjh89zxj33juzt6p",
             "account_data": {
@@ -52,12 +52,12 @@
             "seed":
             "1110000000000000000000000000000000000000000000000000000000000001",
             "vote_weight_percent": 50,
-            "host_port_peer": 44001,
-            "host_port_rpc": 45001,
-            "host_port_ws": 47001,
+            "host_port_peer": 44901,
+            "host_port_rpc": 45901,
+            "host_port_ws": 47901,
             "host_ip": "127.0.0.1",
-            "rpc_url": "http://127.0.0.1:45001",
-            "ws_url": "ws://127.0.0.1:47001",
+            "rpc_url": "http://127.0.0.1:45901",
+            "ws_url": "ws://127.0.0.1:47901",
             "account":
             "nano_1ge7edbt774uw7z8exomwiu19rd14io1nocyin5jwpiit3133p9eaaxn74ub",
             "account_data": {
@@ -78,12 +78,12 @@
             "seed":
             "1110000000000000000000000000000000000000000000000000000000000002",
             "vote_weight_percent": 50,
-            "host_port_peer": 44002,
-            "host_port_rpc": 45002,
-            "host_port_ws": 47002,
+            "host_port_peer": 44902,
+            "host_port_rpc": 45902,
+            "host_port_ws": 47902,
             "host_ip": "127.0.0.1",
-            "rpc_url": "http://127.0.0.1:45002",
-            "ws_url": "ws://127.0.0.1:47002",
+            "rpc_url": "http://127.0.0.1:45902",
+            "ws_url": "ws://127.0.0.1:47902",
             "account":
             "nano_3sz3bi6mpeg5jipr1up3hotxde6gxum8jotr55rzbu9run8e3wxjq1rod9a6",
             "account_data": {
