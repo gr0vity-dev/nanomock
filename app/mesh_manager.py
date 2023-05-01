@@ -8,13 +8,14 @@ from app.internal.dependency_checker import DependencyChecker
 from app.modules.nl_parse_config import ConfigParser
 from app.internal.nl_initialise import InitialBlocks
 from app.modules.nl_rpc import NanoRpc
-from app.internal.utils import log_and_auto_retry_on_error, NanoMeshLogger
+from app.internal.utils import log_on_success, auto_retry_on_error, NanoMeshLogger
 from typing import List, Dict, Optional, Tuple, Union
 import concurrent.futures
 from math import floor
 import yaml
 import json
 import time
+import inspect
 
 logger = NanoMeshLogger.get_logger(__name__)
 
@@ -22,6 +23,7 @@ logger = NanoMeshLogger.get_logger(__name__)
 class NanoMeshManager:
 
     def __init__(self, dir_path, project_name):
+        self.command_mapping = self._initialize_command_mapping()
         self.dir_path = dir_path
         self.dependency_checker = DependencyChecker()
         self.dependency_checker.check_dependencies()
@@ -39,6 +41,36 @@ class NanoMeshManager:
 
         os.makedirs(self.nano_nodes_path, exist_ok=True)
 
+    def _initialize_command_mapping(self):
+        return {
+            'create': self.create_docker_compose_file,
+            'start': self.start_containers,
+            'status': self.network_status,
+            'restart': self.restart_containers,
+            'reset': self.reset_nodes_data,
+            'init': self.init_nodes,
+            'stop': self.stop_containers,
+            'remove': self.remove_containers,
+            'down': self.remove_containers,
+            'destroy': lambda: self.destroy(remove_files=True),
+        }
+
+    def subprocess_capture_raise(self, cmd, shell=True, cwd=None, increment=0):
+        #Capture output to stdout or raise CalledProcessError if the command returns a non-zero exit code
+        try:
+            result = subprocess.run(cmd,
+                                    shell=shell,
+                                    check=True,
+                                    capture_output=True,
+                                    text=True,
+                                    cwd=cwd)
+
+            #print(str.join(" ", [str(e) for e in cmd]))
+            return result
+        except subprocess.CalledProcessError as e:
+            response = self.auto_heal(e, cmd, shell, cwd, increment)
+            return response
+
     def _run_docker_compose_command(self,
                                     command,
                                     nodes: Optional[List[str]] = None):
@@ -49,7 +81,7 @@ class NanoMeshManager:
         base_command.extend(command)
         if nodes: base_command.extend(nodes)
 
-        subprocess.run(base_command, check=True)
+        return self.subprocess_capture_raise(base_command, shell=False)
 
     def _get_default(self, config_name):
         """ Load config with default values"""
@@ -71,9 +103,8 @@ class NanoMeshManager:
                                        env_variables)
 
     def _generate_docker_compose_yml_file(self):
-        conf_p = ConfigParser(self.dir_path)
-        conf_p.set_docker_compose()
-        conf_p.write_docker_compose()
+        self.conf_p.set_docker_compose()
+        self.conf_p.write_docker_compose()
 
     def _generate_config_node_file(self, node_name):
         config_node = self.conf_p.get_config_from_path(node_name,
@@ -127,26 +158,30 @@ class NanoMeshManager:
         self._generate_config_rpc_file(node_name)
         self._generate_nanomonitor_config_file(node_name)
 
-    def _count_online_containers(self, node_names: List[str]) -> int:
-        online_count = 0
-
+    def _online_containers(self, node_names: List[str]) -> List[str]:
+        online_containers = []
         for container in node_names:
             cmd = f"docker ps |grep {container}$ | wc -l"
-            res = subprocess.run(cmd,
-                                 capture_output=True,
-                                 text=True,
-                                 shell=True)
+            res = self.subprocess_capture_raise(cmd)
             online = int(res.stdout.strip())
 
             if online == 1:
-                online_count += 1
+                online_containers.append(container)
 
+        return online_containers
+
+    def _count_online_containers(self, node_names: List[str]) -> int:
+        online_containers = self._online_containers(node_names)
+        online_count = len(online_containers)
         return online_count
 
     def _get_nodes_block_counts(
-            self,
-            nodes_rpc: List[NanoRpc]) -> List[Dict[str, Union[str, int]]]:
+            self, nodes_name: List[str]) -> List[Dict[str, Union[str, int]]]:
         nodes_block_count = []
+
+        nodes_rpc = ([
+            NanoRpc(self.conf_p.get_node_rpc(node)) for node in nodes_name
+        ] if nodes_name is not None else self._get_all_rpc())
 
         for nano_rpc in nodes_rpc:
             block_count = nano_rpc.block_count()
@@ -163,17 +198,36 @@ class NanoMeshManager:
         return nodes_block_count
 
     def _generate_network_status_report(
-            self, nodes_block_count: List[Dict[str, Union[str, int]]]) -> str:
+            self, nodes: List[str],
+            nodes_block_count: List[Dict[str, Union[str, int]]]) -> str:
+
+        if not nodes_block_count:
+            return ""
+
         max_count = max(int(bc["count"]) for bc in nodes_block_count)
 
-        report = []
-        for bc in nodes_block_count:
+        def get_node_data(
+                node_name: str) -> Union[Dict[str, Union[str, int]], None]:
+            for bc in nodes_block_count:
+                if bc["node_name"] == node_name:
+                    return bc
+            return None
+
+        def format_report_line(bc: Dict[str, Union[str, int]]) -> str:
             node_version = f'{bc["version"]["node_vendor"]} {bc["version"]["build_info"].split(" ")[0]}'
             synced_percentage = floor(
                 int(bc["cemented"]) / max_count * 10000) / 100
-            report_line = '{:<16} {:<20} {:>6.2f}% synced | {}/{} blocks cemented'.format(
+            return '{:<16} {:<20} {:>6.2f}% synced | {}/{} blocks cemented'.format(
                 bc["node_name"], node_version, synced_percentage,
                 bc["cemented"], bc["count"])
+
+        report = []
+        for node_name in nodes:
+            node_data = get_node_data(node_name)
+            if node_data:
+                report_line = format_report_line(node_data)
+            else:
+                report_line = f'{node_name} [down]'
             report.append(report_line)
 
         return '\n' + '\n'.join(report)
@@ -187,6 +241,7 @@ class NanoMeshManager:
         rpc_url = self.conf_p.get_node_rpc(container)
         try:
             nano_rpc = NanoRpc(rpc_url)
+            logging.info("call _is_rpc_available")
             if nano_rpc.block_count(max_retry=0):
                 return container, True
         except Exception as e:
@@ -206,61 +261,65 @@ class NanoMeshManager:
         if not nodes_name:
             nodes_name = self.conf_p.get_nodes_name()
 
-        while len(nodes_name) > 0:
-            if not wait:
-                break
+        nodes_to_check = nodes_name.copy()
 
+        def get_unavailable_nodes(nodes: List[str], timeout: int) -> List[str]:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 results = list(
-                    executor.map(self._is_rpc_available, nodes_name,
-                                 [timeout] * len(nodes_name)))
-
-            nodes_name = [
+                    executor.map(self._is_rpc_available, nodes,
+                                 [timeout] * len(nodes)))
+            return [
                 container for container, available in results if not available
             ]
 
+        while len(nodes_to_check) > 0:
+            if not wait:
+                break
+
+            nodes_to_check = get_unavailable_nodes(nodes_to_check, timeout)
+
             if time.time() - start_time > max_timeout_s:
                 raise ValueError(
-                    f"TIMEOUT: RPCs not reachable for nodes {nodes_name}")
+                    f"TIMEOUT: RPCs not reachable for nodes {nodes_to_check}")
 
-            if len(nodes_name) > 0:
+            if len(nodes_to_check) > 0:
                 time.sleep(1)
 
-        logger.info(f"Nodes {self.conf_p.get_nodes_name()} reachable")
+        logger.info(f"Nodes {nodes_name} reachable")
 
-    def online_containers_status(self, node_names: List[str]) -> str:
-        online_count = self._count_online_containers(node_names)
-        total_nodes = len(node_names)
+    def online_containers_status(self, online_containers: List[str],
+                                 total_nodes) -> str:
 
+        online_count = len(online_containers)
         if online_count == total_nodes:
             return f"All {online_count} containers online"
         else:
             return f"{online_count}/{total_nodes} containers online"
 
+    @log_on_success
     def network_status(self, nodes_name: Optional[List[str]] = None) -> str:
         if nodes_name == []:
             return ""
 
         nodes_name = self.conf_p.get_nodes_name()
-        nodes_rpc = ([
-            NanoRpc(self.conf_p.get_node_rpc(node)) for node in nodes_name
-        ] if nodes_name is not None else self._get_all_rpc())
+        online_containers = self._online_containers(nodes_name)
+        status_msg = self.online_containers_status(online_containers,
+                                                   len(nodes_name))
+        # if "All" not in status_msg:
+        #     return status_msg
 
-        status_msg = self.online_containers_status(nodes_name)
-        if "All" not in status_msg:
-            return status_msg
-
-        nodes_block_count = self._get_nodes_block_counts(nodes_rpc)
-        logger.info(self._generate_network_status_report(nodes_block_count))
+        nodes_block_count = self._get_nodes_block_counts(online_containers)
+        return status_msg + self._generate_network_status_report(
+            nodes_name, nodes_block_count)
 
     def create_docker_compose_file(self):
         self._prepare_nodes()
         self._generate_docker_compose_env_file()
         self._generate_docker_compose_yml_file()
-        logger.info(
-            f"SUCCESS: Docker Compose file created at {self.compose_yml_path}")
+        logger.success(
+            f"Docker Compose file created at {self.compose_yml_path}")
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def init_wallets(self):
         #self.start_nodes('all')  #fixes a bug on mac m1
         init_blocks = InitialBlocks(rpc_url=self.conf_p.get_nodes_rpc()[0])
@@ -277,20 +336,20 @@ class NanoMeshManager:
                     node_name,
                     seed=self.conf_p.get_node_config(node_name)["seed"])
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def init_nodes(self):
         self.init_wallets()
-        init_blocks = InitialBlocks(rpc_url=ConfigParser().get_nodes_rpc()[0])
+        init_blocks = InitialBlocks(rpc_url=self.conf_p.get_nodes_rpc()[0])
         init_blocks.publish_initial_blocks()
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def reset_nodes_data(self, nodes: Optional[List[str]] = None):
         self.stop_containers(nodes)
         nodes_to_process = nodes or ['.']
         for node in nodes_to_process:
             node_path = f'{self.nano_nodes_path}/{node}' if nodes else self.nano_nodes_path
-            command = 'rm -f $(find . -name "*.ldb")'
-            subprocess.run(command, shell=True, check=True, cwd=node_path)
+            cmd = 'rm -f $(find . -name "*.ldb")'
+            self.subprocess_capture_raise(cmd, node_path)
 
     def overwrite_files(self, src, dst):
         if not os.path.exists(dst):
@@ -307,28 +366,28 @@ class NanoMeshManager:
         self.create_docker_compose_file()
         self.build_containers()
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def restart_containers(self, nodes: Optional[List[str]] = None):
         self._run_docker_compose_command(["restart"], nodes)
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def build_containers(self):
         self._run_docker_compose_command(["build"])
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def start_containers(self, nodes: Optional[List[str]] = None):
         self._run_docker_compose_command(["up", "-d"], nodes)
-        self._wait_for_rpc_availability()
+        self._wait_for_rpc_availability(nodes)
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def stop_containers(self, nodes: Optional[List[str]] = None):
         self._run_docker_compose_command(["stop"], nodes)
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def remove_containers(self):
         self._run_docker_compose_command(["down"])
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def destroy(self, remove_files=False):
         # Stop and remove containers
         self.remove_containers()
@@ -336,24 +395,122 @@ class NanoMeshManager:
         # Remove the created files and folders if remove_files is True
         if remove_files:
             shutil.rmtree(self.nano_nodes_path)
-            print(f"Removed directory: {self.nano_nodes_path}")
+            return f"Removed directory: {self.nano_nodes_path}"
 
-    @log_and_auto_retry_on_error
+    @log_on_success
     def update(self):
         self._run_docker_compose_command(["pull"])
         # Remove containers and networks
         self.remove_containers()
         self.build_containers()
 
-    def auto_heal(self, error):
-        if "Error response from daemon: driver failed programming external connectivity on endpoint" in error:
-            container_name = re.search(
-                r"Error response from daemon:.*?on endpoint (\w+)",
-                error).group(1)
-            self.stop_containers(container_name)
-            time.sleep(5)
+    def auto_heal(self,
+                  error: subprocess.CalledProcessError,
+                  cmd,
+                  cmd_shell,
+                  cmd_cwd,
+                  increment=0):
+        if increment >= 3:
+            raise (error)
+
+        stderr = error.stderr
+        healable_errors = {
+            "address_in_use": ("programming external connectivity on endpoint",
+                               self.heal_address_in_use),
+            "docker_in_use":
+            ("Error response from daemon: Conflict. The container name",
+             self.heal_docker_in_use),
+        }
+
+        for error_key, (error_msg, heal_func) in healable_errors.items():
+            if error_msg not in stderr:
+                continue
+
+            logger.warn(
+                f"Retry attempt {increment}... {error_key}: \n {stderr}")
+
+            if heal_func(error_msg, stderr):
+                increment += 1
+                return self.subprocess_capture_raise(cmd,
+                                                     cmd_shell,
+                                                     cmd_cwd,
+                                                     increment=increment)
+
+        raise (error)
+
+    def heal_address_in_use(self, error_msg, stderr):
+        container_name = re.search(r"{} (\w+)".format(error_msg),
+                                   stderr).group(1)
+        self.subprocess_capture_raise(
+            f"docker stop {container_name} && sleep 5 && docker start {container_name}",
+            shell=True)
+        return True
+
+    def heal_docker_in_use(self, error_msg, stderr):
+        pattern = r'{} "/([^"]+)"'.format(error_msg)
+        match = re.search(pattern, stderr)
+        if match:
+            container_name = match.group(1)
+            self.subprocess_capture_raise(
+                f"docker stop {container_name} && docker rm {container_name} && sleep 5",
+                shell=True)
             return True
         return False
+
+    # def auto_heal(self,
+    #               error: subprocess.CalledProcessError,
+    #               cmd,
+    #               increment=0):
+    #     if increment >= 3: raise (error)
+
+    #     stderr = error.stderr
+    #     healable_errors = {
+    #         "address_in_use":
+    #         "programming external connectivity on endpoint",
+    #         "docker_in_use":
+    #         "Error response from daemon: Conflict. The container name"
+    #     }
+
+    #     for error_key, error_msg in healable_errors.items():
+    #         if error_msg not in stderr: continue
+    #         logger.warn(
+    #             f"Retry attempt {increment}... {error_key}: \n {stderr}")
+
+    #         retry = False
+
+    #         if error_key == "address_in_use":
+    #             container_name = re.search(r"{} (\w+)".format(error_msg),
+    #                                        stderr).group(1)
+    #             self.subprocess_capture_raise(
+    #                 f"docker stop {container_name} && sleep 5 && docker start {container_name}",
+    #                 shell=True)
+    #             retry = True
+
+    #         if error_key == "docker_in_use":
+    #             pattern = r'{} "/([^"]+)"'.format(error_msg)
+    #             match = re.search(pattern, stderr)
+    #             if match:
+    #                 container_name = match.group(1)
+    #                 self.subprocess_capture_raise(
+    #                     f"docker stop {container_name} && docker rm {container_name} && sleep 5",
+    #                     shell=True)
+    #                 retry = True
+
+    #         if retry:
+    #             increment = increment + 1
+    #             return self.subprocess_capture_raise(cmd, increment=increment)
+
+    #     raise (error)
+
+    def execute_command(self, command, nodes=None):
+        if command not in self.command_mapping:
+            raise ValueError(f"Invalid command: {command}")
+
+        func = self.command_mapping[command]
+        func(nodes=nodes) if nodes else func()
+
+        # if result is not None:
+        #     logger.dynamic("INFO", result)
 
 
 if __name__ == "__main__":
