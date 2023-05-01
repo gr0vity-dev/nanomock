@@ -7,17 +7,17 @@ import oyaml as yaml
 import secrets
 import json
 import copy
+import shutil
+
 from datetime import datetime
-from math import ceil
 from nanolib import Block
 from extradict import NestedData
 from pathlib import Path
-import importlib.resources
+from importlib import resources
 
-from app.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
-from app.modules.nl_rpc import NanoRpc
-
-#compose output file : nano-local/nano_nodes/docker-compose.yml
+from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
+from nanomock.modules.nl_rpc import NanoRpc
+from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version
 
 
 def str2bool(v):
@@ -26,10 +26,34 @@ def str2bool(v):
 
 class ConfigReadWrite:
 
-    def __init__(self, config_path="nanomesh/nl_config.toml"):
+    def __init__(self, config_path):
         if not os.path.exists(config_path):
             #logging.warning("No config file exists. creating 'nl_config.toml'")
             raise FileExistsError(config_path)
+
+    @read_from_package_if_needed
+    def read_json(self, path, is_packaged=False):
+        with open(path, "r") as f:
+            return json.load(f)
+
+    @read_from_package_if_needed
+    def read_file(self, path, is_packaged=False):
+        with open(path, "r") as f:
+            return f.readlines()
+
+    @read_from_package_if_needed
+    def read_toml(self, path, is_packaged=False):
+        try:
+            with open(path, "rb") as f:
+                toml_dict = tomli.load(f)
+                return toml_dict
+        except tomli.TOMLDecodeError as e:
+            logging.error("Invalid config file! \n {}".format(str(e)))
+
+    @read_from_package_if_needed
+    def read_yaml(self, path, is_packaged=False):
+        with open(path, 'r') as f:
+            return yaml.safe_load(f)
 
     def write_json(self, path, json_dict):
         with open(path, "w") as f:
@@ -39,14 +63,6 @@ class ConfigReadWrite:
         with open(path, "a") as f:
             json.dump(json_dict, f)
             f.write('\n')
-
-    def read_json(self, path):
-        with open(path, "r") as f:
-            return json.load(f)
-
-    def read_file(self, path):
-        with open(path, "r") as f:
-            return f.readlines()
 
     def write_list(self, path, list):
         with open(path, "w") as f:
@@ -60,18 +76,6 @@ class ConfigReadWrite:
         with open(path, "wb") as f:
             tomli_w.dump(content, f)
 
-    def read_toml(self, path):
-        try:
-            with open(path, "rb") as f:
-                toml_dict = tomli.load(f)
-                return toml_dict
-        except tomli.TOMLDecodeError as e:
-            logging.error("Invalid config file! \n {}".format(str(e)))
-
-    def read_yaml(self, path):
-        with open(path, 'r') as f:
-            return yaml.safe_load(f)
-
     def write_yaml(self, path, content):
         with open(path, 'w') as f:
             yaml.dump(json.loads(str(content).replace("'", '"')),
@@ -83,13 +87,14 @@ class ConfigParser:
 
     preconfigured_peers = []
 
-    def __init__(self, app_dir="nanomesh/"):
+    def __init__(self, app_dir):
         self.enabled_services = []
         self._set_path_variables(app_dir)
         self.conf_rw = ConfigReadWrite(self.nl_config_path)
         self.nano_lib = NanoLibTools()
         self.config_dict = self.conf_rw.read_toml(self.nl_config_path)
-        self.compose_dict = self.conf_rw.read_yaml(self.default_compose_path)
+        self.compose_dict = self.conf_rw.read_yaml(self.default_compose_path,
+                                                   is_packaged=True)
         self.__config_dict_add_genesis_to_nodes()
         self.__config_dict_set_node_variables()  #modifies config_dict
         self.__config_dict_set_default_values()  #modifies config_dict
@@ -102,14 +107,22 @@ class ConfigParser:
     def _set_path_variables(self, app_dir):
         user_app_dir = Path(app_dir).resolve()
 
-        #self.services_dir = user_app_dir / "services"
-        self.services_dir = Path().resolve(
-        ) / "app" / "internal" / "data" / "services"
-        # self.services_dir = pkg_resources.resource_filename(
-        #     'nano_mesh', 'app/internal/data/services')
-        self.default_compose_path = self.services_dir / "default_docker-compose.yml"
-        self.default_nanomonitor_config = self.services_dir / "nanomonitor" / "default_config.php"
-        self.default_nanovotevisu_config = self.services_dir / "nanovotevisu" / "default_docker-compose.yml"
+        if is_packaged_version():
+            self.services_dir = "nanomock.internal.data.services"
+            self.default_compose_path = f"{self.services_dir}.default_docker-compose.yml"
+            self.default_nanomonitor_config = f"{self.services_dir}.nanomonitor.default_config.php"
+            self.default_nanomonitor_config = f"{self.services_dir}.nanovotevisu.default_docker-compose.yml"
+        else:
+            self.services_dir = Path().resolve(
+            ) / "app" / "internal" / "data" / "services"
+
+            self.default_compose_path = Path(
+                self.services_dir) / "default_docker-compose.yml"
+            self.default_nanomonitor_config = Path(
+                self.services_dir) / "nanomonitor" / "default_config.php"
+            self.default_nanovotevisu_config = Path(
+                self.services_dir
+            ) / "nanovotevisu" / "default_docker-compose.yml"
 
         self.nl_config_path = user_app_dir / "nl_config.toml"
         self.nano_nodes_path = user_app_dir / "nano_nodes"
@@ -380,7 +393,7 @@ class ConfigParser:
         return self.config_dict["representatives"]["node_prefix"] + "_"
 
     def get_project_name(self):
-        return self.get_node_prefix() + "nanolocal"
+        return self.get_node_prefix() + "nanomock"
 
     def get_xnolib_localctx(self):
         ctx = {
@@ -481,7 +494,7 @@ class ConfigParser:
 
     def get_node_rpc(self, node_name):
         node_conf = self.get_node_config(node_name)
-        return node_conf["rpc_url"]       
+        return node_conf["rpc_url"]
 
     def get_nodes_rpc(self):
         api = []
@@ -521,7 +534,7 @@ class ConfigParser:
 
     def write_nanomonitor_config(self, node_name):
         nanomonitor_config = self.conf_rw.read_file(
-            self.default_nanomonitor_config)
+            self.default_nanomonitor_config, is_packaged=True)
         destination_path = str(
             os.path.join(
                 self.nodes_dir,
@@ -656,7 +669,8 @@ class ConfigParser:
 
     def set_nanoticker_compose(self):
         nanoticker_compose = self.conf_rw.read_yaml(
-            f'{self.services_dir}/nanoticker/default_docker-compose.yml')
+            f'{self.services_dir}/nanoticker/default_docker-compose.yml',
+            is_packaged=True)
         self.compose_dict["services"]["nl_nanoticker"] = nanoticker_compose[
             "services"]["nl_nanoticker"]
         self.compose_dict["services"]["nl_nanoticker"]["build"]["args"][
@@ -667,7 +681,8 @@ class ConfigParser:
 
     def set_nanolooker_compose(self):
         nanolooker_compose = self.conf_rw.read_yaml(
-            f'{self.services_dir}/nanolooker/default_docker-compose.yml')
+            f'{self.services_dir}/nanolooker/default_docker-compose.yml',
+            is_packaged=True)
 
         for container in nanolooker_compose["services"]:
             container_name = self.get_node_prefix(
@@ -707,7 +722,8 @@ class ConfigParser:
         host_port_inc = 0
         for node in self.config_dict["representatives"]["nodes"]:
             nanomonitor_compose = self.conf_rw.read_yaml(
-                f'{self.services_dir}/nanomonitor/default_docker-compose.yml')
+                f'{self.services_dir}/nanomonitor/default_docker-compose.yml',
+                is_packaged=True)
             container = nanomonitor_compose["services"]["default_monitor"]
             container_name = f'{node["name"]}_monitor'
             self.compose_dict["services"][container_name] = copy.deepcopy(
@@ -734,7 +750,8 @@ class ConfigParser:
         #Create prometheus, prom-gateway and grafana IF we use default prom-gateway
         if self.get_config_value("prom_gateway") == "nl_pushgateway:9091":
             promexporter_compose = self.conf_rw.read_yaml(
-                f'{self.services_dir}/promexporter/default_docker-compose.yml')
+                f'{self.services_dir}/promexporter/default_docker-compose.yml',
+                is_packaged=True)
             for container in promexporter_compose["services"]:
                 self.compose_dict["services"][
                     container] = promexporter_compose["services"][container]
@@ -751,8 +768,8 @@ class ConfigParser:
             prom_runid = self.get_config_value("prom_runid")
 
             nanomonitor_compose = self.conf_rw.read_yaml(
-                f'{self.services_dir}/promexporter/default_exporter_docker-compose.yml'
-            )
+                f'{self.services_dir}/promexporter/default_exporter_docker-compose.yml',
+                is_packaged=True)
             container = nanomonitor_compose["services"]["default_exporter"]
             container_name = f'{node["name"]}_exporter'
             self.compose_dict["services"][container_name] = copy.deepcopy(
@@ -782,7 +799,8 @@ class ConfigParser:
             copy_conf = f'cp -p {conf_source_path} {tcp_analyzer_config_path}'
             os.system(copy_conf)
 
-        tcp_analyzer_config = self.conf_rw.read_json(tcp_analyzer_config_path)
+        tcp_analyzer_config = self.conf_rw.read_json(tcp_analyzer_config_path,
+                                                     is_packaged=True)
         tcp_analyzer_config["files_name_in"] = []
 
         tcpdump_compose = self.conf_rw.read_yaml(

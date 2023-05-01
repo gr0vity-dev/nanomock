@@ -1,13 +1,11 @@
-#!./venv_nano_local/bin/python
-
 import time
 import unittest
 from itertools import islice
 from math import ceil, floor
 
-from app.modules.nl_rpc import NanoRpc
-from app.modules.nl_parse_config import ConfigParser, ConfigReadWrite
-from app.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
+from nanomock.modules.nl_rpc import NanoRpc
+from nanomock.modules.nl_parse_config import ConfigParser, ConfigReadWrite
+from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
 
 
 class BlockGenerator():
@@ -397,20 +395,18 @@ class BlockAsserts():
             expected_count)  #if other blocks arrive in the meantime
 
     def assert_increasing_block_count(self, expected_count, exit_after_s=5):
-        try:
-            stall_time = time.time()
-            #with timeout(exit_after_s, exception=RuntimeError) :
-            prev_block_count = self.nano_rpc_default.block_count()["count"]
-            while True:
-                if time.time() - stall_time > exit_after_s: break
-                rpc_block_count_end = int(
-                    self.nano_rpc_default.block_count()["count"])
-                if rpc_block_count_end > prev_block_count:  #reset stall_time on increased block_count
-                    stall_time = time.time()
-                if rpc_block_count_end >= expected_count: break
-                time.sleep(0.2)
-        except Exception as e:
-            print("DEBUG assert_expected_block_count exception", str(e))
+        stall_time = time.time()
+        #with timeout(exit_after_s, exception=RuntimeError) :
+        prev_block_count = self.nano_rpc_default.block_count()["count"]
+        while True:
+            if time.time() - stall_time > exit_after_s: break
+            rpc_block_count_end = int(
+                self.nano_rpc_default.block_count()["count"])
+            if rpc_block_count_end > prev_block_count:  #reset stall_time on increased block_count
+                stall_time = time.time()
+            if rpc_block_count_end >= expected_count: break
+            time.sleep(0.2)
+
         self.tc.assertGreaterEqual(
             rpc_block_count_end,
             expected_count)  #if other blocks arrive in the meantime
@@ -583,8 +579,8 @@ class BlockAsserts():
 
 class BlockReadWrite():
 
-    def __init__(self):
-        self.conf_rw = ConfigReadWrite()
+    def __init__(self, nl_conf_path):
+        self.conf_rw = ConfigReadWrite(nl_conf_path)
 
     def read_blocks_from_disk(self,
                               path,

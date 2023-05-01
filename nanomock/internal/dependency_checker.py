@@ -11,9 +11,14 @@ class DependencyChecker:
 
     @staticmethod
     def _load_dependencies_config():
-        config_file = "dependencies_config.json"
-        with open(config_file, "r") as f:
-            return json.load(f)
+        return {
+            "docker": ["docker", "--version"],
+            "docker-compose": ["docker-compose", "--version"]
+        }
+
+        # config_file = "dependencies_config.json"
+        # with open(config_file, "r") as f:
+        #     return json.load(f)
 
     def check_dependencies(self):
         missing_dependencies = []

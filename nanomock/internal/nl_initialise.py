@@ -1,14 +1,18 @@
-from app.modules.nl_rpc import NanoRpc
-from app.modules.nl_nanolib import raw_high_precision_percent
-from app.modules.nl_parse_config import ConfigParser
+from nanomock.modules.nl_rpc import NanoRpc
+from nanomock.modules.nl_nanolib import raw_high_precision_percent
+from nanomock.modules.nl_parse_config import ConfigParser
 import logging
 
 
 class InitialBlocks:
 
-    def __init__(self, rpc_url="http://localhost:45000"):
+    def __init__(self, data_dir, rpc_url, logger=None):
+        if logger is None:
+            logger = logging.getLogger(__name__)
+
+        self.logger = logger
         self.api = NanoRpc(rpc_url)
-        self.config = ConfigParser()
+        self.config = ConfigParser(data_dir)
 
     def __epoch_link(self, epoch: int):
         message = f"epoch v{epoch} block"
@@ -26,7 +30,7 @@ class InitialBlocks:
                 self.config.get_genesis_account_data()["private"],
                 self.config.get_genesis_account_data()["account"],
             )
-            logging.info("EPOCH {} sent by genesis : HASH {}".format(
+            self.logger.info("EPOCH {} sent by genesis : HASH {}".format(
                 e, epoch_block["hash"]))
             self.__log_active_difficulty()
             e += 1
@@ -34,7 +38,7 @@ class InitialBlocks:
 
     def __log_active_difficulty(self):
         diff = self.api.get_active_difficulty()
-        logging.info(
+        self.logger.info(
             f'current_diff : [{diff["network_current"]}]  current_receive_diff: [{diff["network_receive_current"]}]'
         )
 
@@ -42,7 +46,7 @@ class InitialBlocks:
         fv_canary_send_block = self.api.create_send_block_pkey(
             self.config.get_genesis_account_data()["private"],
             self.config.get_canary_account_data()["account"], 1)
-        logging.info(
+        self.logger.info(
             "SEND FINAL VOTES CANARY BLOCK FROM {} To {} : HASH {}".format(
                 self.config.get_genesis_account_data()["account"],
                 self.config.get_canary_account_data()["account"],
@@ -53,20 +57,20 @@ class InitialBlocks:
             self.config.get_canary_account_data()["private"], 1,
             self.config.get_genesis_account_data()["account"],
             fv_canary_send_block["hash"])
-        logging.info("OPENED CANARY ACCOUNT {} : HASH {}".format(
+        self.logger.info("OPENED CANARY ACCOUNT {} : HASH {}".format(
             self.config.get_canary_account_data()["account"],
             fv_canary_open_block["hash"]))
 
     def __send_to_burn(self):
         if "burn_amount" not in self.config.get_all():
-            logging.debug("[burn_amount] is not set. exit send_to_burn()")
+            self.logger.debug("[burn_amount] is not set. exit send_to_burn()")
             return False
 
         genesis_balance = int(
             self.api.check_balance(self.config.get_genesis_account_data()
                                    ["account"])["balance_raw"])
         if int(self.config.get_all()["burn_amount"]) > genesis_balance:
-            logging.warning(
+            self.logger.warning(
                 "[burn_amount] exceeds genesis balance. exit send_to_burn()")
             return False
 
@@ -75,7 +79,7 @@ class InitialBlocks:
             self.config.get_burn_account_data()["account"],
             self.config.get_all()["burn_amount"])
 
-        logging.info("SENT {:>40} FROM {} To {} : HASH {}".format(
+        self.logger.info("SENT {:>40} FROM {} To {} : HASH {}".format(
             send_block["amount_raw"],
             self.config.get_genesis_account_data()["account"],
             self.config.get_burn_account_data()["account"],
@@ -87,7 +91,6 @@ class InitialBlocks:
                 self.config.get_genesis_account_data()["account"],
                 include_only_confirmed=False)["balance_raw"])
         genesis_remaing = genesis_balance
-        print(genesis_balance)
 
         for node_conf in self.config.get_nodes_config():
 
@@ -97,16 +100,15 @@ class InitialBlocks:
                 node_conf["balance"] = raw_high_precision_percent(
                     genesis_balance, node_conf["vote_weight_percent"])
             node_conf["balance"] = int(node_conf["balance"])
-            print(node_conf["balance"])
 
             if genesis_remaing <= 0:
-                logging.warning(
+                self.logger.warning(
                     f'No Genesis funds remaining! Account [{node_conf["account_data"]["account"]}] will not be opened!'
                 )
                 #self.config["node_account_data"].remove(node_account_data)
                 continue
             if genesis_remaing < node_conf["balance"]:
-                logging.warning(
+                self.logger.warning(
                     f'Genesis remaining balance is too small! Send {genesis_remaing} instead of {node_conf["balance"]}.'
                 )
 
@@ -127,7 +129,7 @@ class InitialBlocks:
                 self.config.get_genesis_account_data()["private"],
                 node_account_data["account"], node_conf["balance"])
 
-            logging.info("SENT {:>40} FROM {} To {} : HASH {}".format(
+            self.logger.info("SENT {:>40} FROM {} To {} : HASH {}".format(
                 send_block["amount_raw"],
                 self.config.get_genesis_account_data()["account"],
                 node_account_data["account"], send_block["hash"]))
@@ -137,7 +139,7 @@ class InitialBlocks:
                 node_conf["balance"], node_account_data["account"],
                 send_block["hash"])
 
-            logging.info("OPENED PR ACCOUNT {} : HASH {}".format(
+            self.logger.info("OPENED PR ACCOUNT {} : HASH {}".format(
                 node_account_data["account"], open_block["hash"]))
 
     def create_node_wallet(self,
@@ -153,7 +155,7 @@ class InitialBlocks:
         if seed != None:
             wallet = api.wallet_create(seed)["wallet"]
             account = api.get_account_data(seed, 0)["account"]
-        logging.info(
+        self.logger.info(
             f"WALLET {wallet} CREATED FOR {node_name} WITH ACCOUNT {account}")
 
     def publish_initial_blocks(self):

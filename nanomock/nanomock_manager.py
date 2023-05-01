@@ -4,11 +4,11 @@ import shutil
 import subprocess
 import logging
 from typing import List, Optional
-from app.internal.dependency_checker import DependencyChecker
-from app.modules.nl_parse_config import ConfigParser
-from app.internal.nl_initialise import InitialBlocks
-from app.modules.nl_rpc import NanoRpc
-from app.internal.utils import log_on_success, auto_retry_on_error, NanoMeshLogger
+from .internal.dependency_checker import DependencyChecker
+from .modules.nl_parse_config import ConfigParser
+from .internal.nl_initialise import InitialBlocks
+from .modules.nl_rpc import NanoRpc
+from .internal.utils import log_on_success, NanoLocalLogger
 from typing import List, Dict, Optional, Tuple, Union
 import concurrent.futures
 from math import floor
@@ -17,10 +17,10 @@ import json
 import time
 import inspect
 
-logger = NanoMeshLogger.get_logger(__name__)
+logger = NanoLocalLogger.get_logger(__name__)
 
 
-class NanoMeshManager:
+class NanoLocalManager:
 
     def __init__(self, dir_path, project_name):
         self.command_mapping = self._initialize_command_mapping()
@@ -53,6 +53,7 @@ class NanoMeshManager:
             'remove': self.remove_containers,
             'down': self.remove_containers,
             'destroy': lambda: self.destroy(remove_files=True),
+            'rpc': self.run_rpc
         }
 
     def subprocess_capture_raise(self, cmd, shell=True, cwd=None, increment=0):
@@ -89,11 +90,13 @@ class NanoMeshManager:
         if config_name == "config_node":
             default_config_path = os.path.join(self.services_dir,
                                                "default_config-node.toml")
-            return self.conf_p.conf_rw.read_toml(default_config_path)
+            return self.conf_p.conf_rw.read_toml(default_config_path,
+                                                 is_packaged=True)
         elif config_name == "config_rpc":
             default_rpc_path = os.path.join(self.services_dir,
                                             "default_config-rpc.toml")
-            return self.conf_p.conf_rw.read_toml(default_rpc_path)
+            return self.conf_p.conf_rw.read_toml(default_rpc_path,
+                                                 is_packaged=True)
         else:
             return {}
 
@@ -320,9 +323,24 @@ class NanoMeshManager:
             f"Docker Compose file created at {self.compose_yml_path}")
 
     @log_on_success
+    def run_rpc(self, payload=None, nodes=None):
+        responses = []
+        if nodes is None:
+            nodes = self.conf_p.get_nodes_name()
+
+        for node in nodes:
+            node_rpc = NanoRpc(self.conf_p.get_node_rpc(node))
+            response = node_rpc.post_with_auth(payload)
+            responses.append(response)
+
+        return json.dumps(responses, indent=2)
+
+    @log_on_success
     def init_wallets(self):
         #self.start_nodes('all')  #fixes a bug on mac m1
-        init_blocks = InitialBlocks(rpc_url=self.conf_p.get_nodes_rpc()[0])
+        init_blocks = InitialBlocks(self.dir_path,
+                                    self.conf_p.get_nodes_rpc()[0],
+                                    logger=logger)
         for node_name in self.conf_p.get_nodes_name():
             if node_name == self.conf_p.get_genesis_node_name():
                 init_blocks.create_node_wallet(
@@ -339,7 +357,9 @@ class NanoMeshManager:
     @log_on_success
     def init_nodes(self):
         self.init_wallets()
-        init_blocks = InitialBlocks(rpc_url=self.conf_p.get_nodes_rpc()[0])
+        init_blocks = InitialBlocks(self.dir_path,
+                                    self.conf_p.get_nodes_rpc()[0],
+                                    logger=logger)
         init_blocks.publish_initial_blocks()
 
     @log_on_success
@@ -350,17 +370,6 @@ class NanoMeshManager:
             node_path = f'{self.nano_nodes_path}/{node}' if nodes else self.nano_nodes_path
             cmd = 'rm -f $(find . -name "*.ldb")'
             self.subprocess_capture_raise(cmd, node_path)
-
-    def overwrite_files(self, src, dst):
-        if not os.path.exists(dst):
-            os.makedirs(dst)
-        for item in os.listdir(src):
-            s = os.path.join(src, item)
-            d = os.path.join(dst, item)
-            if os.path.isdir(s):
-                self.overwrite_files(s, d)
-            else:
-                shutil.copy2(s, d)
 
     def init_containers(self):
         self.create_docker_compose_file()
@@ -410,23 +419,23 @@ class NanoMeshManager:
                   cmd_shell,
                   cmd_cwd,
                   increment=0):
-        if increment >= 3:
+        if increment >= 10:
             raise (error)
 
         stderr = error.stderr
         healable_errors = {
             "address_in_use": ("programming external connectivity on endpoint",
-                               self.heal_address_in_use),
+                               self._heal_address_in_use),
             "docker_in_use":
             ("Error response from daemon: Conflict. The container name",
-             self.heal_docker_in_use),
+             self._heal_docker_in_use),
         }
 
         for error_key, (error_msg, heal_func) in healable_errors.items():
             if error_msg not in stderr:
                 continue
 
-            logger.warn(
+            logger.warning(
                 f"Retry attempt {increment}... {error_key}: \n {stderr}")
 
             if heal_func(error_msg, stderr):
@@ -438,7 +447,7 @@ class NanoMeshManager:
 
         raise (error)
 
-    def heal_address_in_use(self, error_msg, stderr):
+    def _heal_address_in_use(self, error_msg, stderr):
         container_name = re.search(r"{} (\w+)".format(error_msg),
                                    stderr).group(1)
         self.subprocess_capture_raise(
@@ -446,7 +455,7 @@ class NanoMeshManager:
             shell=True)
         return True
 
-    def heal_docker_in_use(self, error_msg, stderr):
+    def _heal_docker_in_use(self, error_msg, stderr):
         pattern = r'{} "/([^"]+)"'.format(error_msg)
         match = re.search(pattern, stderr)
         if match:
@@ -502,15 +511,17 @@ class NanoMeshManager:
 
     #     raise (error)
 
-    def execute_command(self, command, nodes=None):
+    def execute_command(self, command, nodes=None, payload=None):
         if command not in self.command_mapping:
             raise ValueError(f"Invalid command: {command}")
 
         func = self.command_mapping[command]
-        func(nodes=nodes) if nodes else func()
-
-        # if result is not None:
-        #     logger.dynamic("INFO", result)
+        if command == 'rpc':
+            func(payload=payload, nodes=nodes)
+        elif nodes:
+            func(nodes=nodes)
+        else:
+            func()
 
 
 if __name__ == "__main__":

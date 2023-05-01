@@ -4,7 +4,7 @@ import json
 import secrets
 import time
 import logging
-from app.modules.nl_nanolib import NanoLibTools, get_account_public_key
+from nanomock.modules.nl_nanolib import NanoLibTools, get_account_public_key
 
 # for block_creation, we store local frontier info, so that subsequant calls know about the most recent frontier without needing to publish the block to the ledger.
 _FRONTIER_INFO = {}
@@ -76,7 +76,7 @@ class NanoRpc:
                 )
             max_retry = max_retry - 1
             if max_retry >= 0:
-                time.sleep(0.5)  #100ms
+                time.sleep(0.1)  #100ms
                 self.post_with_auth(content, max_retry, timeout=timeout)
 
     def is_online(self, timeout=1):

@@ -1,5 +1,8 @@
+build/
+dist/
 venv_py/
 .vscode
 **pycache**
 **pytest_cache**
 **nano_nodes/
+**egg-info**

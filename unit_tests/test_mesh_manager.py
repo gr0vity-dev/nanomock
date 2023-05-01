@@ -1,7 +1,6 @@
-#!./venv_py/bin/python
 import unittest
-from app.mesh_manager import NanoMeshManager
-from app.modules.nl_rpc import NanoRpc
+from nanolocal.nanolo_manager import NanoLocalManager
+from nanolocal.modules.nl_rpc import NanoRpc
 import json
 import pytest
 from typing import Tuple
@@ -9,9 +8,9 @@ import time
 
 
 @pytest.fixture(scope="class", autouse=True)
-def nanomesh_fixture(request) -> Tuple[NanoMeshManager, NanoRpc]:
+def local_fixture(request) -> Tuple[NanoLocalManager, NanoRpc]:
     # Setup code here
-    manager = NanoMeshManager("unit_tests/configs", "unittest")
+    manager = NanoLocalManager("unit_tests/configs", "unittest")
     nano_rpc = NanoRpc("http://127.0.0.1:45900")
 
     request.cls.manager, request.cls.nano_rpc = manager, nano_rpc
@@ -22,11 +21,11 @@ def nanomesh_fixture(request) -> Tuple[NanoMeshManager, NanoRpc]:
     manager.execute_command("destroy")
 
 
-class TestNanoMesh:
+class TestLocal:
 
     @classmethod
     def setup_class(cls):
-        cls.manager: NanoMeshManager
+        cls.manager: NanoLocalManager
         cls.nano_rpc: NanoRpc
         cls.manager.execute_command("down")
         cls.manager.execute_command("create")
@@ -76,7 +75,7 @@ class TestNanoMesh:
     #     assert status == expected_network_status
 
 
-# def test_network_status_2(manager: NanoMeshManager, nano_rpc: NanoRpc):
+# def test_network_status_2(manager: NanoLocalManager, nano_rpc: NanoRpc):
 #     manager.stop_containers(["unittest_pr2"])
 #     status = manager.network_status()
 #     with open('unit_tests/data/expected_network_status_2.txt', 'r') as f:
