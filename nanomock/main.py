@@ -49,7 +49,7 @@ def main():
                 "The --payload argument is required for the 'rpc' command.")
         manager.execute_command(args.command, args.nodes, args.payload)
     else:
-        manager.execute_command(args.command, args.nodes)
+        manager.execute_command(args.command, args.nodes, args.payload)
 
 
 if __name__ == '__main__':

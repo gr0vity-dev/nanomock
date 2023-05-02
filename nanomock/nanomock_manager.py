@@ -42,21 +42,26 @@ class NanoLocalManager:
         os.makedirs(self.nano_nodes_path, exist_ok=True)
 
     def _initialize_command_mapping(self):
+        #(command_method , validation_method)
         return {
-            'create': self.create_docker_compose_file,
-            'start': self.start_containers,
-            'status': self.network_status,
-            'restart': self.restart_containers,
-            'reset': self.reset_nodes_data,
-            'init': self.init_nodes,
-            'stop': self.stop_containers,
-            'remove': self.remove_containers,
-            'down': self.remove_containers,
-            'destroy': lambda: self.destroy(remove_files=True),
-            'rpc': self.run_rpc
+            'create': (self.create_docker_compose_file, None),
+            'start': (self.start_containers, None),
+            'status': (self.network_status, None),
+            'restart': (self.restart_containers, None),
+            'reset': (self.reset_nodes_data, None),
+            'init': (self.init_nodes, None),
+            'stop': (self.stop_containers, None),
+            'remove': (self.remove_containers, None),
+            'down': (self.remove_containers, None),
+            'destroy': (lambda: self.destroy(remove_files=True), None),
+            'rpc': (self.run_rpc, self._rpc_validator)
         }
 
-    def subprocess_capture_raise(self, cmd, shell=True, cwd=None, increment=0):
+    def _subprocess_capture_raise(self,
+                                  cmd,
+                                  shell=True,
+                                  cwd=None,
+                                  increment=0):
         #Capture output to stdout or raise CalledProcessError if the command returns a non-zero exit code
         try:
             result = subprocess.run(cmd,
@@ -82,7 +87,7 @@ class NanoLocalManager:
         base_command.extend(command)
         if nodes: base_command.extend(nodes)
 
-        return self.subprocess_capture_raise(base_command, shell=False)
+        return self._subprocess_capture_raise(base_command, shell=False)
 
     def _get_default(self, config_name):
         """ Load config with default values"""
@@ -165,7 +170,7 @@ class NanoLocalManager:
         online_containers = []
         for container in node_names:
             cmd = f"docker ps |grep {container}$ | wc -l"
-            res = self.subprocess_capture_raise(cmd)
+            res = self._subprocess_capture_raise(cmd)
             online = int(res.stdout.strip())
 
             if online == 1:
@@ -322,6 +327,12 @@ class NanoLocalManager:
         logger.success(
             f"Docker Compose file created at {self.compose_yml_path}")
 
+    def _rpc_validator(self, nodes=None, payload=None):
+        if not payload:
+            raise ValueError(
+                "The --payload argument is required for the 'rpc' command.")
+        return nodes, payload
+
     @log_on_success
     def run_rpc(self, payload=None, nodes=None):
         responses = []
@@ -360,7 +371,7 @@ class NanoLocalManager:
         init_blocks = InitialBlocks(self.dir_path,
                                     self.conf_p.get_nodes_rpc()[0],
                                     logger=logger)
-        init_blocks.publish_initial_blocks()
+        return init_blocks.publish_initial_blocks()
 
     @log_on_success
     def reset_nodes_data(self, nodes: Optional[List[str]] = None):
@@ -369,7 +380,7 @@ class NanoLocalManager:
         for node in nodes_to_process:
             node_path = f'{self.nano_nodes_path}/{node}' if nodes else self.nano_nodes_path
             cmd = 'rm -f $(find . -name "*.ldb")'
-            self.subprocess_capture_raise(cmd, node_path)
+            self._subprocess_capture_raise(cmd, node_path)
 
     def init_containers(self):
         self.create_docker_compose_file()
@@ -440,17 +451,17 @@ class NanoLocalManager:
 
             if heal_func(error_msg, stderr):
                 increment += 1
-                return self.subprocess_capture_raise(cmd,
-                                                     cmd_shell,
-                                                     cmd_cwd,
-                                                     increment=increment)
+                return self._subprocess_capture_raise(cmd,
+                                                      cmd_shell,
+                                                      cmd_cwd,
+                                                      increment=increment)
 
         raise (error)
 
     def _heal_address_in_use(self, error_msg, stderr):
         container_name = re.search(r"{} (\w+)".format(error_msg),
                                    stderr).group(1)
-        self.subprocess_capture_raise(
+        self._subprocess_capture_raise(
             f"docker stop {container_name} && sleep 5 && docker start {container_name}",
             shell=True)
         return True
@@ -460,68 +471,39 @@ class NanoLocalManager:
         match = re.search(pattern, stderr)
         if match:
             container_name = match.group(1)
-            self.subprocess_capture_raise(
+            self._subprocess_capture_raise(
                 f"docker stop {container_name} && docker rm {container_name} && sleep 5",
                 shell=True)
             return True
         return False
 
-    # def auto_heal(self,
-    #               error: subprocess.CalledProcessError,
-    #               cmd,
-    #               increment=0):
-    #     if increment >= 3: raise (error)
-
-    #     stderr = error.stderr
-    #     healable_errors = {
-    #         "address_in_use":
-    #         "programming external connectivity on endpoint",
-    #         "docker_in_use":
-    #         "Error response from daemon: Conflict. The container name"
-    #     }
-
-    #     for error_key, error_msg in healable_errors.items():
-    #         if error_msg not in stderr: continue
-    #         logger.warn(
-    #             f"Retry attempt {increment}... {error_key}: \n {stderr}")
-
-    #         retry = False
-
-    #         if error_key == "address_in_use":
-    #             container_name = re.search(r"{} (\w+)".format(error_msg),
-    #                                        stderr).group(1)
-    #             self.subprocess_capture_raise(
-    #                 f"docker stop {container_name} && sleep 5 && docker start {container_name}",
-    #                 shell=True)
-    #             retry = True
-
-    #         if error_key == "docker_in_use":
-    #             pattern = r'{} "/([^"]+)"'.format(error_msg)
-    #             match = re.search(pattern, stderr)
-    #             if match:
-    #                 container_name = match.group(1)
-    #                 self.subprocess_capture_raise(
-    #                     f"docker stop {container_name} && docker rm {container_name} && sleep 5",
-    #                     shell=True)
-    #                 retry = True
-
-    #         if retry:
-    #             increment = increment + 1
-    #             return self.subprocess_capture_raise(cmd, increment=increment)
-
-    #     raise (error)
+    def _filter_args(self, func, **kwargs):
+        sig = inspect.signature(func)
+        filtered_args = {
+            k: v
+            for k, v in kwargs.items() if k in sig.parameters
+        }
+        return filtered_args
 
     def execute_command(self, command, nodes=None, payload=None):
         if command not in self.command_mapping:
             raise ValueError(f"Invalid command: {command}")
 
-        func = self.command_mapping[command]
-        if command == 'rpc':
-            func(payload=payload, nodes=nodes)
-        elif nodes:
-            func(nodes=nodes)
+        command_func, validator_func = self.command_mapping[command]
+
+        if validator_func is not None:
+            filtered_validator_args = self._filter_args(validator_func,
+                                                        nodes=nodes,
+                                                        payload=payload)
+            validated_nodes, validated_payload = validator_func(
+                **filtered_validator_args)
         else:
-            func()
+            validated_nodes, validated_payload = nodes, payload
+
+        filtered_command_args = self._filter_args(command_func,
+                                                  nodes=validated_nodes,
+                                                  payload=validated_payload)
+        command_func(**filtered_command_args)
 
 
 if __name__ == "__main__":

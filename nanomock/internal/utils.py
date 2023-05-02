@@ -20,17 +20,31 @@ class NanoLocalLogger(logging.Logger):
         self.log(self.SUCCESS_LEVEL_NUM, message, *args, **kws)
 
     @staticmethod
-    def get_logger(name: str):
+    def get_logger(name: str, handler=None):
         logger = NanoLocalLogger(name)
         logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
+        if handler is None:
+            handler = logging.StreamHandler()
+            handler.setFormatter(
+                logging.Formatter('%(levelname)s: %(message)s'))
+
         logger.addHandler(handler)
         return logger
+
+    LOG_STORE = {}
 
     def dynamic(self, log_level, message):
         log_level = getattr(logger, log_level, logging.INFO)
         logger.log(log_level, message)
+
+    def append_log(self, log_key, log_level, message):
+        self.LOG_STORE.setdefault(log_key, [])
+        self.LOG_STORE[log_key].append(message)
+        self.dynamic(log_level, message)
+
+    def pop(self, log_key):
+        return self.LOG_STORE.pop(log_key)
 
 
 logger = NanoLocalLogger.get_logger(__name__)

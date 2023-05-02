@@ -1,10 +1,11 @@
 import unittest
-from nanolocal.nanolo_manager import NanoLocalManager
-from nanolocal.modules.nl_rpc import NanoRpc
+from nanomock.nanomock_manager import NanoLocalManager
+from nanomock.modules.nl_rpc import NanoRpc
 import json
 import pytest
 from typing import Tuple
 import time
+import logging
 
 
 @pytest.fixture(scope="class", autouse=True)
@@ -59,6 +60,14 @@ class TestLocal:
         with open('unit_tests/data/expected_network_status.txt', 'r') as f:
             expected_network_status = f.read()
         assert status == expected_network_status
+
+    def test_network_init(self):
+
+        log_output = "\n".join(self.manager.init_nodes()[3::])
+        with open('unit_tests/data/expected_init_log.txt', 'r') as f:
+            expected_output = f.read()
+
+        assert log_output == expected_output, f"Log output '{log_output}' does not match expected output '{expected_output}'"
 
     # def test_auto_heal_docker_in_use(self):
     #     result = self.manager.auto_heal([
