@@ -9,6 +9,7 @@ from typing import Tuple
 import tomli
 import oyaml as yaml
 import json
+import bitmath
 
 
 class NanoLocalLogger(logging.Logger):
@@ -132,3 +133,22 @@ def read_from_package_if_needed(read_method):
             return read_method(self, path, *args, is_packaged=False, **kwargs)
 
     return wrapper
+
+
+def find_device_for_path(path: str) -> str:
+    path = Path(path).resolve()
+    df_output = subprocess.check_output(['df', path],
+                                        universal_newlines=True).splitlines()
+
+    # The first line is the header, and the second line contains the information we need
+    device = df_output[1].split()[0]
+
+    return device
+
+
+def convert_to_bytes(size_string, default_unit='B') -> int:
+    if size_string.isnumeric():
+        return int(size_string)
+
+    size = bitmath.parse_string(size_string)
+    return int(size.to_Byte())

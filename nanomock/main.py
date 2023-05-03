@@ -13,7 +13,7 @@ def _get_default_app_dir():
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Docker Manager CLI')
+    parser = argparse.ArgumentParser(description='nanomock cli')
     parser.add_argument('command',
                         choices=[
                             'create', 'start', 'status', 'restart', 'init',
@@ -43,13 +43,7 @@ def main():
     args = parser.parse_args()
     manager = NanoLocalManager(args.dir_path, args.project_name)
 
-    if args.command == 'rpc':
-        if not args.payload:
-            parser.error(
-                "The --payload argument is required for the 'rpc' command.")
-        manager.execute_command(args.command, args.nodes, args.payload)
-    else:
-        manager.execute_command(args.command, args.nodes, args.payload)
+    manager.execute_command(args.command, args.nodes, args.payload)
 
 
 if __name__ == '__main__':

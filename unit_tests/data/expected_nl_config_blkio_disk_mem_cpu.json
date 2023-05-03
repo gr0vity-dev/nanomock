@@ -1,0 +1,50 @@
+{
+    "manual_genesis": {
+        "blkio_config": {
+            "device_read_bps": [
+                {
+                    "rate": 200
+                }
+            ]
+        },
+        "cpus": 0.5,
+        "mem_limit": 1000000000
+    },
+    "manual_pr1": {
+        "blkio_config": {
+            "device_read_bps": [
+                {
+                    "rate": 50000000
+                }
+            ],
+            "device_write_bps": [
+                {
+                    "rate": 50000000
+                }
+            ],
+            "device_read_iops": [
+                {
+                    "rate": 100
+                }
+            ],
+            "device_write_iops": [
+                {
+                    "rate": 100
+                }
+            ]
+        },
+        "cpus": 2.0,
+        "mem_limit": 1000000000
+    },
+    "manual_pr2": {
+        "blkio_config": {
+            "device_read_bps": [
+                {
+                    "rate": 950
+                }
+            ]
+        },
+        "cpus": 0.5,
+        "mem_limit": 1000000000
+    }
+}

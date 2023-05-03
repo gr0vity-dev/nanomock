@@ -17,7 +17,7 @@ All configuration is done inside the config file : `nanonet/nl_config.toml`
 
 To install the library you can
 - clone the respository and run `pip3 install .`
-- or run `pip3 install nanomock`to download teh latest version from PyPi
+- or run `pip3 install nanomock`to download the latest version from PyPi
 
 This gives you access to `nanomock {command}` command which will use `your_current_dir`as its entry point.
 

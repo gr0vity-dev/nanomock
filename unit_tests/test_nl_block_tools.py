@@ -1,15 +1,13 @@
 import unittest
 from unittest.mock import MagicMock
-from nanolocal.internal.nl_block_tools import BlockReadWrite
+from nanomock.internal.nl_block_tools import BlockReadWrite
 import json
 
 
 class TestRefactoredCode(unittest.TestCase):
 
     def setUp(self):
-        self.block_rw = BlockReadWrite(
-            "unit_tests/configs/nl_config.toml"
-        )  # Replace this with the actual class name
+        self.block_rw = BlockReadWrite("unit_tests/configs/nl_config.toml")
         self.block_rw.ba = MagicMock()
         self.block_rw.ba.assert_blockgen_succeeded = MagicMock()
         self.block_rw.conf_rw = MagicMock()

@@ -17,7 +17,7 @@ from importlib import resources
 
 from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
 from nanomock.modules.nl_rpc import NanoRpc
-from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version
+from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version, find_device_for_path, convert_to_bytes
 
 
 def str2bool(v):
@@ -87,9 +87,9 @@ class ConfigParser:
 
     preconfigured_peers = []
 
-    def __init__(self, app_dir):
+    def __init__(self, app_dir, config_file=None):
         self.enabled_services = []
-        self._set_path_variables(app_dir)
+        self._set_path_variables(app_dir, config_file)
         self.conf_rw = ConfigReadWrite(self.nl_config_path)
         self.nano_lib = NanoLibTools()
         self.config_dict = self.conf_rw.read_toml(self.nl_config_path)
@@ -104,8 +104,10 @@ class ConfigParser:
         self.__set_special_account_data()
         #self.__set_docker_compose()
 
-    def _set_path_variables(self, app_dir):
+    def _set_path_variables(self, app_dir, config_file):
         user_app_dir = Path(app_dir).resolve()
+        if config_file is None:
+            config_file = "nl_config.toml"
 
         if is_packaged_version():
             self.services_dir = "nanomock.internal.data.services"
@@ -124,7 +126,7 @@ class ConfigParser:
                 self.services_dir
             ) / "nanovotevisu" / "default_docker-compose.yml"
 
-        self.nl_config_path = user_app_dir / "nl_config.toml"
+        self.nl_config_path = user_app_dir / config_file
         self.nano_nodes_path = user_app_dir / "nano_nodes"
         self.nodes_dir = self.nano_nodes_path / "{node_name}"
         self.compose_out_path = self.nano_nodes_path / "docker-compose.yml"
@@ -843,61 +845,129 @@ class ConfigParser:
     def write_docker_compose(self):
         self.conf_rw.write_yaml(self.compose_out_path, self.compose_dict)
 
-    def get_docker_tag(self, node_name):
-        #takes the first non empty docker_tag.
+    def get_config_tag(self, tag, node_name, default):
+        #takes the first non empty tag.
         #First looks for the individual tag
         #then for the general tag
-        #last uses teh default nanocurrency/nano-beta:latest tag
-
-        individual_tag = self.get_representative_config(
-            "docker_tag", node_name)
-        general_tag = self.get_representative_config("docker_tag", None)
+        #last uses the default
+        individual_tag = self.get_representative_config(tag, node_name)
+        general_tag = self.get_representative_config(tag, None)
 
         if individual_tag["found"]:
             return individual_tag["value"]
         elif general_tag["found"]:
             return general_tag["value"]
         else:
-            return "nanocurrency/nano-beta:latest"
+            return default
+
+    def get_docker_tag(self, node_name):
+        self.get_config_tag(self, "docker_tag", node_name,
+                            "nanocurrency/nano-beta:latest")
+
+    def get_disk_defaults(self, disk_type):
+        disk_defaults = {
+            "NVME": {
+                "device_read_bps": "2000MB",
+                "device_write_bps": "1000MB",
+                "device_read_iops": "200000",
+                "device_write_iops": "200000",
+            },
+            "SSD": {
+                "device_read_bps": "400MB",
+                "device_write_bps": "300MB",
+                "device_read_iops": "50000",
+                "device_write_iops": "40000",
+            },
+            "HDD": {
+                "device_read_bps": "50MB",
+                "device_write_bps": "50MB",
+                "device_read_iops": "100",
+                "device_write_iops": "100",
+            },
+        }
+        return disk_defaults.get(disk_type.upper(), None)
+
+    def add_container_blkio_config(self, container, node_name):
+        blkio_config = {}
+        config_tags = [
+            "device_read_bps",
+            "device_write_bps",
+            "device_read_iops",
+            "device_write_iops",
+        ]
+
+        disk_type = self.get_config_tag("disk", node_name, None)
+        if disk_type:
+            disk_defaults = self.get_disk_defaults(disk_type)
+            if disk_defaults:
+                for tag in config_tags:
+                    rate = convert_to_bytes(disk_defaults[tag])
+                    blkio_config[tag] = [{
+                        "path":
+                        find_device_for_path(self.nl_config_path),
+                        "rate":
+                        rate
+                    }]
+        else:
+            for tag in config_tags:
+                rate = self.get_config_tag(tag, node_name, None)
+                if rate is not None:
+                    blkio_config[tag] = [{
+                        "path":
+                        find_device_for_path(self.nl_config_path),
+                        "rate":
+                        rate
+                    }]
+
+        if blkio_config:
+            container["blkio_config"] = blkio_config
+
+    def add_container_cpu_memory_config(self, container, node_name):
+        cpu = self.get_config_tag("cpu", node_name, None)
+        if cpu is not None:
+            container["cpus"] = float(cpu)
+
+        memory = self.get_config_tag("memory", node_name, None)
+        if memory is not None:
+            container["mem_limit"] = convert_to_bytes(memory)
+
+    def get_container_type(self, user_id):
+        if user_id == "0":
+            return "default_docker_root"
+        elif user_id == "1000":
+            return "default_docker"
+        else:
+            return "default_docker_custom"
+
+    def set_container_image_or_build_args(self, container, user_id,
+                                          docker_tag):
+        if user_id in ["0", "1000"]:
+            container["image"] = f"{docker_tag}"
+        else:
+            container["build"]["args"] = [
+                f'NANO_IMAGE={docker_tag}',
+                f'UID={user_id}',
+            ]
 
     def compose_add_node(self, node_name):
-        #Search for individual docker_tag, then individual executable, then shared docker-tag then shared-executable
-
         user_id = str(os.getuid())
-        docker_tag = self.get_docker_tag(node_name)
+        docker_tag = self.get_config_tag("docker_tag", node_name,
+                                         "nanocurrency/nano-beta:latest")
 
-        if self.config_dict[
-                "tc_enable"]:  #installs iproute2 into the nano_node image
-            container = self.compose_add_container(node_name,
-                                                   "default_docker_custom")
+        container_type = self.get_container_type(user_id)
+        container = self.compose_add_container(node_name, container_type)
+
+        if user_id != "1000" or self.config_dict["tc_enable"]:
             container["user"] = user_id
-            container["build"]["args"][0] = f'NANO_IMAGE={docker_tag}'
-            container["build"]["args"][1] = f'UID={user_id}'
-            container["build"]["args"][
-                2] = f'TC_ENABLE={str(self.config_dict["tc_enable"]).upper()}'
 
-        elif user_id == "0":  #root
-            container = self.compose_add_container(node_name,
-                                                   "default_docker_root")
-            container["image"] = f"{docker_tag}"
+        if self.config_dict["tc_enable"]:
+            container["build"]["args"].append(
+                f'TC_ENABLE={str(self.config_dict["tc_enable"]).upper()}')
 
-        elif user_id == "1000":
-            container = self.compose_add_container(node_name, "default_docker")
-            container["image"] = f"{docker_tag}"
-
-            logging.warning(
-                "No docker_tag or nano_node_path specified. use [latest] (nanocurrency/nano-test:latest)"
-            )
-
-        else:  #non standart user
-            #we need to add the current user as user to the nano_node docker image
-
-            container = self.compose_add_container(node_name,
-                                                   "default_docker_custom")
-            container["user"] = user_id
-            #container["image"] = f"{docker_tag}"
-            container["build"]["args"][0] = f'NANO_IMAGE={docker_tag}'
-            container["build"]["args"][1] = f'UID={user_id}'
+        self.set_container_image_or_build_args(container, user_id, docker_tag)
+        if container:
+            self.add_container_blkio_config(container, node_name)
+            self.add_container_cpu_memory_config(container, node_name)
 
     def compose_set_node_ports(self, node_name):
         node_config = self.get_node_config(node_name)

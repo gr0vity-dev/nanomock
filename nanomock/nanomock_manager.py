@@ -74,7 +74,7 @@ class NanoLocalManager:
             #print(str.join(" ", [str(e) for e in cmd]))
             return result
         except subprocess.CalledProcessError as e:
-            response = self.auto_heal(e, cmd, shell, cwd, increment)
+            response = self.auto_heal(e, shell, cwd, increment)
             return response
 
     def _run_docker_compose_command(self,
@@ -426,7 +426,6 @@ class NanoLocalManager:
 
     def auto_heal(self,
                   error: subprocess.CalledProcessError,
-                  cmd,
                   cmd_shell,
                   cmd_cwd,
                   increment=0):
@@ -451,18 +450,19 @@ class NanoLocalManager:
 
             if heal_func(error_msg, stderr):
                 increment += 1
-                return self._subprocess_capture_raise(cmd,
+                return self._subprocess_capture_raise(error.cmd,
                                                       cmd_shell,
                                                       cmd_cwd,
                                                       increment=increment)
 
+        raise ValueError(error.stderr)
         raise (error)
 
     def _heal_address_in_use(self, error_msg, stderr):
         container_name = re.search(r"{} (\w+)".format(error_msg),
                                    stderr).group(1)
         self._subprocess_capture_raise(
-            f"docker stop {container_name} && sleep 5 && docker start {container_name}",
+            f"docker stop -t 0 {container_name} && sleep 5 && docker start {container_name}",
             shell=True)
         return True
 
@@ -472,7 +472,7 @@ class NanoLocalManager:
         if match:
             container_name = match.group(1)
             self._subprocess_capture_raise(
-                f"docker stop {container_name} && docker rm {container_name} && sleep 5",
+                f"docker stop -t 0 {container_name} && docker rm {container_name} && sleep 5",
                 shell=True)
             return True
         return False
