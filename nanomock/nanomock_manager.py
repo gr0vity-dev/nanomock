@@ -193,6 +193,8 @@ class NanoLocalManager:
         for nano_rpc in nodes_rpc:
             block_count = nano_rpc.block_count()
             version_rpc_call = nano_rpc.version()
+            if not (block_count or version_rpc_call):
+                continue
             node_name = self.conf_p.get_node_name_from_rpc_url(nano_rpc)
             count = int(block_count["count"])
             nodes_block_count.append({
