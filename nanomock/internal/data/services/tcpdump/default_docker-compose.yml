@@ -4,7 +4,7 @@ services:
 
   ns_tcpdump:
     build: 
-      context: ../
+      context: .
       dockerfile: ./services/tcpdump/Dockerfile
     container_name : ns_tcpdump
     volumes:
