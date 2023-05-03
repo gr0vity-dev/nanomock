@@ -1,4 +1,4 @@
-version : '3'
+version: '2.4'
 
 #when nanoticker_enable = true, this will be copied into the docker-compose file in nano_nodes
 services:

@@ -1,4 +1,4 @@
-version : '3'
+version: '2.4'
 
 #when nanovotevisu_enable = true, this will be copied (and adapted) into the docker-compose file in nano_nodes
 services:

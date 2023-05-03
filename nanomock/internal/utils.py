@@ -146,8 +146,8 @@ def find_device_for_path(path: str) -> str:
     return device
 
 
-def convert_to_bytes(size_string, default_unit='B') -> int:
-    if size_string.isnumeric():
+def convert_to_bytes(size_string) -> int:
+    if str(size_string).isnumeric():
         return int(size_string)
 
     size = bitmath.parse_string(size_string)

@@ -916,7 +916,7 @@ class ConfigParser:
                         "path":
                         find_device_for_path(self.nl_config_path),
                         "rate":
-                        rate
+                        convert_to_bytes(rate)
                     }]
 
         if blkio_config:
