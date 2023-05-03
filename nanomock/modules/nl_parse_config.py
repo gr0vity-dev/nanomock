@@ -18,6 +18,7 @@ from importlib import resources
 from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
 from nanomock.modules.nl_rpc import NanoRpc
 from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version, find_device_for_path, convert_to_bytes
+from nanomock.internal.feature_toggle import toggle
 
 
 def str2bool(v):
@@ -895,6 +896,7 @@ class ConfigParser:
         return disk_defaults.get(disk_type.upper(), None)
 
     def add_container_blkio_config(self, container, node_name):
+        if toggle.is_feature_disabled("config_blkio"): return
         blkio_config = {}
         config_tags = [
             "device_read_bps",
