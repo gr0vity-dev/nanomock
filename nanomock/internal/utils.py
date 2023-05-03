@@ -1,3 +1,4 @@
+import os
 import subprocess
 import functools
 import logging
@@ -10,6 +11,7 @@ import tomli
 import oyaml as yaml
 import json
 import bitmath
+import shutil
 
 
 class NanoLocalLogger(logging.Logger):
@@ -152,3 +154,23 @@ def convert_to_bytes(size_string) -> int:
 
     size = bitmath.parse_string(size_string)
     return int(size.to_Byte())
+
+
+def extract_packaged_services_to_disk(destination_path: Path):
+    with resources.path("nanomock", "__init__.py") as src_dir:
+        src_dir = src_dir.parent / "internal" / "data" / "services"
+        dest_dir = destination_path / "services"
+
+        if src_dir.exists():
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src_dir, dest_dir, dirs_exist_ok=True)
+            print(
+                "nanomock data has been copied to your current working directory."
+            )
+        else:
+            print("Error: nanomock data not found.")
+
+
+def shutil_rmtree(path: Path):
+    shutil.rmtree(path)
+    return f"Removed directory: {path}"

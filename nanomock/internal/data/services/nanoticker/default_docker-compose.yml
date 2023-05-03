@@ -5,7 +5,7 @@ services:
 
   nl_nanoticker:
     build: 
-      context: ../
+      context: .
       dockerfile: ./services/nanoticker/Dockerfile
       args:
         - REMOTE_ADDRESS=127.0.0.1 

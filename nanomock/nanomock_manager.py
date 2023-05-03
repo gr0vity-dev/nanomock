@@ -1,6 +1,5 @@
 import os
 import re
-import shutil
 import subprocess
 import logging
 from typing import List, Optional
@@ -8,7 +7,7 @@ from .internal.dependency_checker import DependencyChecker
 from .modules.nl_parse_config import ConfigParser
 from .internal.nl_initialise import InitialBlocks
 from .modules.nl_rpc import NanoRpc
-from .internal.utils import log_on_success, NanoLocalLogger
+from .internal.utils import log_on_success, NanoLocalLogger, shutil_rmtree, extract_packaged_services_to_disk
 from typing import List, Dict, Optional, Tuple, Union
 import concurrent.futures
 from math import floor
@@ -27,7 +26,7 @@ class NanoLocalManager:
         self.dir_path = dir_path
         self.dependency_checker = DependencyChecker()
         self.dependency_checker.check_dependencies()
-        self.conf_p = ConfigParser(dir_path)
+        self.conf_p = ConfigParser(dir_path, logger=logger)
 
         self.nano_nodes_path = self.conf_p.nano_nodes_path
         self.compose_yml_path = self.conf_p.compose_out_path
@@ -35,7 +34,7 @@ class NanoLocalManager:
                                              "dc_nano_local_env")
         self.project_name = project_name
         self.services_dir = self.conf_p.services_dir
-        self.data_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest"
+        self.nodes_data_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest"
         self.config_node_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest/config-node.toml"
         self.config_rpc_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest/config-rpc.toml"
 
@@ -320,12 +319,15 @@ class NanoLocalManager:
         return status_msg + self._generate_network_status_report(
             nodes_name, nodes_block_count)
 
+    @log_on_success
     def create_docker_compose_file(self):
+        extract_packaged_services_to_disk(self.nano_nodes_path)
         self._prepare_nodes()
         self._generate_docker_compose_env_file()
         self._generate_docker_compose_yml_file()
         logger.success(
             f"Docker Compose file created at {self.compose_yml_path}")
+        return "\n".join(self.conf_p.get_enabled_services())
 
     def _rpc_validator(self, nodes=None, payload=None):
         if not payload:
@@ -414,8 +416,7 @@ class NanoLocalManager:
 
         # Remove the created files and folders if remove_files is True
         if remove_files:
-            shutil.rmtree(self.nano_nodes_path)
-            return f"Removed directory: {self.nano_nodes_path}"
+            return shutil_rmtree(self.nano_nodes_path)
 
     @log_on_success
     def update(self):

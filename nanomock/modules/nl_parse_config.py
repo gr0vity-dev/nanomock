@@ -26,9 +26,10 @@ def str2bool(v):
 
 class ConfigReadWrite:
 
-    def __init__(self, config_path):
+    def __init__(self, config_path, logger=None):
+        if logger is None:
+            self.logger = logging.getLogger(__name__)
         if not os.path.exists(config_path):
-            #logging.warning("No config file exists. creating 'nl_config.toml'")
             raise FileExistsError(config_path)
 
     @read_from_package_if_needed
@@ -48,7 +49,7 @@ class ConfigReadWrite:
                 toml_dict = tomli.load(f)
                 return toml_dict
         except tomli.TOMLDecodeError as e:
-            logging.error("Invalid config file! \n {}".format(str(e)))
+            self.logger.error("Invalid config file! \n {}".format(str(e)))
 
     @read_from_package_if_needed
     def read_yaml(self, path, is_packaged=False):
@@ -87,7 +88,10 @@ class ConfigParser:
 
     preconfigured_peers = []
 
-    def __init__(self, app_dir, config_file=None):
+    def __init__(self, app_dir, config_file=None, logger=None):
+        if logger is None:
+            self.logger = logging.getLogger(__name__)
+
         self.enabled_services = []
         self._set_path_variables(app_dir, config_file)
         self.conf_rw = ConfigReadWrite(self.nl_config_path)
@@ -181,14 +185,14 @@ class ConfigParser:
 
             if "name" not in node:
                 node["name"] = f"{secrets.token_hex(6)}".lower()
-                logging.warning(
+                self.logger.warning(
                     f'no name set for a node. New name : {node["name"]}')
                 modified_config = True
             node["name"] = node["name"].lower()
 
             if "seed" not in node and not self.is_genesis(node):
                 node["seed"] = secrets.token_hex(32)
-                logging.warning(
+                self.logger.warning(
                     f'no seed set for a node. New seed : {node["seed"]}')
                 modified_config = True
 
@@ -833,9 +837,12 @@ class ConfigParser:
             f'TCPDUMP enabled ! This may lead to a decrease in performance!')
         self.conf_rw.write_json(tcp_analyzer_config_path, tcp_analyzer_config)
 
+    def get_enabled_services(self):
+        return self.enabled_services
+
     def print_enabled_services(self):
         for service in self.enabled_services:
-            logging.info(service)
+            self.logger.info(service)
 
     def get_config_value(self, key):
         if key not in self.config_dict:
@@ -996,7 +1003,7 @@ class ConfigParser:
             os.system(copy_node)
             os.system(copy_dockerfile)
         else:
-            logging.error(
+            self.logger.error(
                 f'No nano_node could be found at [{exec_path}]. This container will fail on start'
             )
 

@@ -18,7 +18,7 @@ services:
   
   nl_nanolooker:  
     build: 
-      context: ../
+      context: .
       dockerfile: ./services/nanolooker/Dockerfile
       args:
         - REMOTE_ADDRESS=127.0.0.1

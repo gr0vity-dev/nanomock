@@ -5,7 +5,7 @@ services:
 
   nl_nanovotevisu:
     build: 
-      context: ../
+      context: .
       dockerfile: ./services/nanovotevisu/Dockerfile
       args:
         - REMOTE_ADDRESS=127.0.0.1 
