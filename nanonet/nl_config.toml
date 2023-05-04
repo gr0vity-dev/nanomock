@@ -8,7 +8,7 @@ NANO_TEST_EPOCH_2_RECV = "0x000000000000000f"
 NANO_TEST_MAGIC_NUMBER = "LC"
 
 #if you enabel any services , please set the ip for the machine in your network. default 127.0.0.1
-remote_address = '192.168.178.88' 
+remote_address = '127.0.0.1' 
 #enables nanolooker block explorer at port 42000.
 #creates mongodb docker container with default port 27017
 nanolooker_enable = false
@@ -23,6 +23,10 @@ nanomonitor_enable = false
 nanoticker_enable = false #nanomonitor_enable must be true for this to properly work
 #Enable nano-vote-visualizer for genesis account on port 42001
 nanovotevisu_enable = false
+
+promexporter_enable = false
+prom_gateway = "nl_pushgateway:9091"
+prom_runid = "nanomock"
 
 
 [representatives]

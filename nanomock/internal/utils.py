@@ -164,13 +164,24 @@ def extract_packaged_services_to_disk(destination_path: Path):
         if src_dir.exists():
             dest_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src_dir, dest_dir, dirs_exist_ok=True)
-            print(
+            logger.info(
                 "nanomock data has been copied to your current working directory."
             )
         else:
-            print("Error: nanomock data not found.")
+            logger.error("Error: nanomock data not found.")
 
 
 def shutil_rmtree(path: Path):
     shutil.rmtree(path)
     return f"Removed directory: {path}"
+
+
+def subprocess_run_capture_output(cmd, shell=True, cwd=None):
+
+    result = subprocess.run(cmd,
+                            shell=shell,
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                            cwd=cwd)
+    return result

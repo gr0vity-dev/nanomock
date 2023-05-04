@@ -6,8 +6,9 @@ from typing import List, Optional
 from .internal.dependency_checker import DependencyChecker
 from .modules.nl_parse_config import ConfigParser
 from .internal.nl_initialise import InitialBlocks
+from .docker import create_docker_interface
 from .modules.nl_rpc import NanoRpc
-from .internal.utils import log_on_success, NanoLocalLogger, shutil_rmtree, extract_packaged_services_to_disk
+from .internal.utils import log_on_success, NanoLocalLogger, shutil_rmtree, extract_packaged_services_to_disk, subprocess_run_capture_output
 from typing import List, Dict, Optional, Tuple, Union
 import concurrent.futures
 from math import floor
@@ -23,11 +24,11 @@ class NanoLocalManager:
 
     def __init__(self, dir_path, project_name):
         self.command_mapping = self._initialize_command_mapping()
-        self.dir_path = dir_path
+        self.conf_p = ConfigParser(dir_path, logger=logger)
         self.dependency_checker = DependencyChecker()
         self.dependency_checker.check_dependencies()
-        self.conf_p = ConfigParser(dir_path, logger=logger)
 
+        self.dir_path = dir_path
         self.nano_nodes_path = self.conf_p.nano_nodes_path
         self.compose_yml_path = self.conf_p.compose_out_path
         self.compose_env_path = os.path.join(self.nano_nodes_path,
@@ -39,6 +40,9 @@ class NanoLocalManager:
         self.config_rpc_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest/config-rpc.toml"
 
         os.makedirs(self.nano_nodes_path, exist_ok=True)
+
+        self.docker_interface = create_docker_interface(
+            self.compose_yml_path, self.project_name)
 
     def _initialize_command_mapping(self):
         #(command_method , validation_method)
@@ -55,38 +59,6 @@ class NanoLocalManager:
             'destroy': (lambda: self.destroy(remove_files=True), None),
             'rpc': (self.run_rpc, self._rpc_validator)
         }
-
-    def _subprocess_capture_raise(self,
-                                  cmd,
-                                  shell=True,
-                                  cwd=None,
-                                  increment=0):
-        #Capture output to stdout or raise CalledProcessError if the command returns a non-zero exit code
-        try:
-            result = subprocess.run(cmd,
-                                    shell=shell,
-                                    check=True,
-                                    capture_output=True,
-                                    text=True,
-                                    cwd=cwd)
-
-            #print(str.join(" ", [str(e) for e in cmd]))
-            return result
-        except subprocess.CalledProcessError as e:
-            response = self.auto_heal(e, shell, cwd, increment)
-            return response
-
-    def _run_docker_compose_command(self,
-                                    command,
-                                    nodes: Optional[List[str]] = None):
-        base_command = [
-            "docker-compose", "-f", self.compose_yml_path, "-p",
-            self.project_name
-        ]
-        base_command.extend(command)
-        if nodes: base_command.extend(nodes)
-
-        return self._subprocess_capture_raise(base_command, shell=False)
 
     def _get_default(self, config_name):
         """ Load config with default values"""
@@ -169,7 +141,7 @@ class NanoLocalManager:
         online_containers = []
         for container in node_names:
             cmd = f"docker ps |grep {container}$ | wc -l"
-            res = self._subprocess_capture_raise(cmd)
+            res = subprocess_run_capture_output(cmd)
             online = int(res.stdout.strip())
 
             if online == 1:
@@ -384,7 +356,7 @@ class NanoLocalManager:
         for node in nodes_to_process:
             node_path = f'{self.nano_nodes_path}/{node}' if nodes else self.nano_nodes_path
             cmd = 'rm -f $(find . -name "*.ldb")'
-            self._subprocess_capture_raise(cmd, node_path)
+            subprocess_run_capture_output(cmd, node_path)
 
     def init_containers(self):
         self.create_docker_compose_file()
@@ -392,24 +364,24 @@ class NanoLocalManager:
 
     @log_on_success
     def restart_containers(self, nodes: Optional[List[str]] = None):
-        self._run_docker_compose_command(["restart"], nodes)
+        return self.docker_interface.compose_restart(nodes)
 
     @log_on_success
     def build_containers(self):
-        self._run_docker_compose_command(["build"])
+        return self.docker_interface.compose_build()
 
     @log_on_success
     def start_containers(self, nodes: Optional[List[str]] = None):
-        self._run_docker_compose_command(["up", "-d"], nodes)
+        self.docker_interface.compose_start(nodes)
         self._wait_for_rpc_availability(nodes)
 
     @log_on_success
     def stop_containers(self, nodes: Optional[List[str]] = None):
-        self._run_docker_compose_command(["stop"], nodes)
+        self.docker_interface.compose_stop(nodes)
 
     @log_on_success
     def remove_containers(self):
-        self._run_docker_compose_command(["down"])
+        self.docker_interface.compose_down()
 
     @log_on_success
     def destroy(self, remove_files=False):
@@ -422,63 +394,10 @@ class NanoLocalManager:
 
     @log_on_success
     def update(self):
-        self._run_docker_compose_command(["pull"])
+        self.docker_interface.compose_pull()
         # Remove containers and networks
         self.remove_containers()
         self.build_containers()
-
-    def auto_heal(self,
-                  error: subprocess.CalledProcessError,
-                  cmd_shell,
-                  cmd_cwd,
-                  increment=0):
-        if increment >= 10:
-            raise (error)
-
-        stderr = error.stderr
-        healable_errors = {
-            "address_in_use": ("programming external connectivity on endpoint",
-                               self._heal_address_in_use),
-            "docker_in_use":
-            ("Error response from daemon: Conflict. The container name",
-             self._heal_docker_in_use),
-        }
-
-        for error_key, (error_msg, heal_func) in healable_errors.items():
-            if error_msg not in stderr:
-                continue
-
-            logger.warning(
-                f"Retry attempt {increment}... {error_key}: \n {stderr}")
-
-            if heal_func(error_msg, stderr):
-                increment += 1
-                return self._subprocess_capture_raise(error.cmd,
-                                                      cmd_shell,
-                                                      cmd_cwd,
-                                                      increment=increment)
-
-        raise ValueError(error.stderr)
-        raise (error)
-
-    def _heal_address_in_use(self, error_msg, stderr):
-        container_name = re.search(r"{} (\w+)".format(error_msg),
-                                   stderr).group(1)
-        self._subprocess_capture_raise(
-            f"docker stop -t 0 {container_name} && sleep 5 && docker start {container_name}",
-            shell=True)
-        return True
-
-    def _heal_docker_in_use(self, error_msg, stderr):
-        pattern = r'{} "/([^"]+)"'.format(error_msg)
-        match = re.search(pattern, stderr)
-        if match:
-            container_name = match.group(1)
-            self._subprocess_capture_raise(
-                f"docker stop -t 0 {container_name} && docker rm {container_name} && sleep 5",
-                shell=True)
-            return True
-        return False
 
     def _filter_args(self, func, **kwargs):
         sig = inspect.signature(func)

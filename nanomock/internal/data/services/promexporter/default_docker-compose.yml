@@ -23,7 +23,7 @@ services:
     container_name: nl_prometheus
     restart: unless-stopped
     volumes:
-      - services/promexporter/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./services/promexporter/prometheus.yml:/etc/prometheus/prometheus.yml
       - nl_prometheus_data:/prometheus
     # tmpfs: /prometheus:uid=99
     command:
@@ -52,7 +52,7 @@ services:
       - 42005:3000
     volumes:
       - nl_grafana_data:/var/lib/grafana
-      - services/promexporter/grafana/provisioning/:/etc/grafana/provisioning/
+      - ./services/promexporter/grafana/provisioning/:/etc/grafana/provisioning/
       # env_file:
       # - ./grafana/config.monitoring
     networks:
