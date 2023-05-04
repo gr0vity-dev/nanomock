@@ -21,7 +21,7 @@ services:
   
   default_docker_custom: #if we use traffic control we need to install iproute2 
     build: 
-      context: ../
+      context: .
       dockerfile: ./services/custom_Dockerfile
       args:
         - NANO_IMAGE=nanocurrency/nano-beta:latest
