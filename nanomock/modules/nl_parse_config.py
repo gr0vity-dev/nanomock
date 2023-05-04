@@ -501,7 +501,11 @@ class ConfigParser:
 
     def get_node_rpc(self, node_name):
         node_conf = self.get_node_config(node_name)
-        return node_conf["rpc_url"]
+        if node_conf:
+            return node_conf["rpc_url"]
+        raise ValueError(
+            f"{node_name} undefined in {self.nl_config_path}\nValid names:{self.get_nodes_name()}"
+        )
 
     def get_nodes_rpc(self):
         api = []
@@ -766,6 +770,10 @@ class ConfigParser:
                 self.compose_dict["volumes"][volume] = promexporter_compose[
                     "volumes"][volume]
 
+            self.enabled_services.append(
+                f'promgateway enabled at {self.get_config_value("remote_address")}:42005'
+            )
+
         #Create 1 exporter per node
         for node in self.config_dict["representatives"]["nodes"]:
             node_config = self.get_node_config(node["name"])
@@ -793,10 +801,6 @@ class ConfigParser:
 
             self.enabled_services.append(
                 f'{container_name} added for node {node["name"]}')
-
-        self.enabled_services.append(
-            f'promexporter enabled at {self.get_config_value("remote_address")}:42005'
-        )
 
     def set_tcpdump_compose(self):
 
