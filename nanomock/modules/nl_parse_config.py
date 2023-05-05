@@ -351,42 +351,38 @@ class ConfigParser:
             return True
         return False
 
-    def recursive_pop_key_if_value(self, d, k, val):
+    def _remove_keys_with_value(self, d, k, val):
         #if dict (d), search for key (k) that has value (val) and remove key-value pairfrom dict
         if k in d and d[k] == val:
             d.pop(k)
         for v in d.values():
             if isinstance(v, list):
                 for el in v:
-                    self.recursive_pop_key_if_value(el, k, val)
+                    self._remove_keys_with_value(el, k, val)
             elif isinstance(v, dict):
-                return self.recursive_pop_key_if_value(v, k, val)
+                return self._remove_keys_with_value(v, k, val)
         return None
 
-    def modify_nanolocal_config(self, nested_path: str, nested_value: str):
-        #EXAMPLE, set "docker_tag"
-        #nested_path : "representatives.nodes.*.docker_tag"
-        #nested_value : "nanocurrency/..."
+    def modify_nanolocal_config(self,
+                                nested_path: str,
+                                nested_value: str,
+                                save: bool = True):
+        config_nested = NestedData(copy.deepcopy(self.config_dict))
 
-        #EXAMPLE, remove "docker_tag"
-        #nested_path : "representatives.nodes.*.docker_tag"
-        #nested_value : NULL
-
-        config_l = NestedData(self.conf_rw.read_toml(self.services_dir))
         if nested_value is None:
-            config_l.merge("DELETE_ME", nested_path)
-        else:  #set value
-            config_l.merge(nested_value, nested_path)
+            config_nested.merge("DELETE_ME", nested_path)
+        else:
+            config_nested.merge(nested_value, nested_path)
 
-        #Remove all keys where value is "DELETE_ME"
-        self.recursive_pop_key_if_value(config_l.data,
-                                        nested_path.split(".")[-1:][0],
-                                        "DELETE_ME")
+        self._remove_keys_with_value(config_nested.data,
+                                     nested_path.split(".")[-1:][0],
+                                     "DELETE_ME")
 
-        #update current config instance, so we don't need to reread from disk on each modification
-        self.config_dict = config_l
-        #save to disk aswell
-        self.conf_rw.write_toml(self.services_dir, config_l.data)
+        if save:
+            self.config_dict = config_nested.data
+            self.conf_rw.write_toml(self.nl_config_path, config_nested.data)
+
+        return config_nested
 
     def set_prom_runid(self, runid):
         self.runid = runid

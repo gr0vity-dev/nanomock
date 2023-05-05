@@ -53,11 +53,13 @@ class NanoLocalManager:
             'restart': (self.restart_containers, None),
             'reset': (self.reset_nodes_data, None),
             'init': (self.init_nodes, None),
+            'init_wallets': (self.init_wallets, None),
             'stop': (self.stop_containers, None),
             'remove': (self.remove_containers, None),
             'down': (self.remove_containers, None),
             'destroy': (lambda: self.destroy(remove_files=True), None),
-            'rpc': (self.run_rpc, self._rpc_validator)
+            'rpc': (self.run_rpc, self._validator_rpc),
+            'conf_edit': (self.conf_edit, self._validator_conf_edit)
         }
 
     def _get_default(self, config_name):
@@ -277,6 +279,11 @@ class NanoLocalManager:
         else:
             return f"{online_count}/{total_nodes} containers online"
 
+    def conf_edit(self, payload):
+        print(payload)
+        self.conf_p.modify_nanolocal_config(payload["path"], payload["value"])
+        return True
+
     @log_on_success
     def network_status(self, nodes_name: Optional[List[str]] = None) -> str:
         if nodes_name == []:
@@ -303,10 +310,22 @@ class NanoLocalManager:
             f"Docker Compose file created at {self.compose_yml_path}")
         return "\n".join(self.conf_p.get_enabled_services())
 
-    def _rpc_validator(self, nodes=None, payload=None):
+    def _validator_rpc(self, nodes=None, payload=None):
         if not payload:
             raise ValueError(
                 "The --payload argument is required for the 'rpc' command.")
+        return nodes, payload
+
+    def _validator_conf_edit(self, nodes=None, payload=None):
+        print("_validator_conf_edit", payload)
+        if payload is None:
+            raise ValueError(
+                "payload must be provided '{\"path\" : ... , \"value\": ...}'")
+        if "path" not in payload:
+            raise ValueError("key \"path\" must be provided")
+        if "value" not in payload:
+            raise ValueError("key \"value\" must be provided")
+
         return nodes, payload
 
     @log_on_success
@@ -326,8 +345,7 @@ class NanoLocalManager:
     def init_wallets(self):
         #self.start_nodes('all')  #fixes a bug on mac m1
         init_blocks = InitialBlocks(self.dir_path,
-                                    self.conf_p.get_nodes_rpc()[0],
-                                    logger=logger)
+                                    self.conf_p.get_nodes_rpc()[0])
         for node_name in self.conf_p.get_nodes_name():
             if node_name == self.conf_p.get_genesis_node_name():
                 init_blocks.create_node_wallet(
@@ -340,13 +358,13 @@ class NanoLocalManager:
                     self.conf_p.get_node_config(node_name)["rpc_url"],
                     node_name,
                     seed=self.conf_p.get_node_config(node_name)["seed"])
+        return init_blocks.logger.pop("InitialBlocks")
 
     @log_on_success
     def init_nodes(self):
         self.init_wallets()
         init_blocks = InitialBlocks(self.dir_path,
-                                    self.conf_p.get_nodes_rpc()[0],
-                                    logger=logger)
+                                    self.conf_p.get_nodes_rpc()[0])
         return init_blocks.publish_initial_blocks()
 
     @log_on_success
@@ -364,11 +382,11 @@ class NanoLocalManager:
 
     @log_on_success
     def restart_containers(self, nodes: Optional[List[str]] = None):
-        return self.docker_interface.compose_restart(nodes)
+        return None, self.docker_interface.compose_restart(nodes)
 
     @log_on_success
     def build_containers(self):
-        return self.docker_interface.compose_build()
+        return None, self.docker_interface.compose_build()
 
     @log_on_success
     def start_containers(self, nodes: Optional[List[str]] = None):
@@ -390,7 +408,7 @@ class NanoLocalManager:
 
         # Remove the created files and folders if remove_files is True
         if remove_files:
-            return shutil_rmtree(self.nano_nodes_path)
+            return None, shutil_rmtree(self.nano_nodes_path)
 
     @log_on_success
     def update(self):

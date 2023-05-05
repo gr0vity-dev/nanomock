@@ -20,6 +20,14 @@ class TestConfigParser(unittest.TestCase):
             }
         return extracted_values
 
+    def _load_modify_conf_edit(self, nested_path, nested_value):
+        config_parser = ConfigParser("unit_tests/configs/mock_nl_config",
+                                     config_file="conf_edit_config.toml")
+        modified_config = config_parser.modify_nanolocal_config(nested_path,
+                                                                nested_value,
+                                                                save=False)
+        return config_parser.config_dict, modified_config
+
     def test_parse_default_path(self):
         config_parser = ConfigParser("unit_tests/configs")
         config_parser.config_dict.pop("tcpdump_filename")
@@ -53,6 +61,117 @@ class TestConfigParser(unittest.TestCase):
             expected_dict = json.load(f)
 
         self.assertDictEqual(expected_dict, extracted_values)
+
+    def test_conf_edit_insert_wildcard(self):
+        nested_path = "representatives.nodes.*.new_key"
+        nested_value = "some_value/with_sp@cial_cHars"
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        for node in loaded_config["representatives"]["nodes"]:
+            node["new_key"] = nested_value
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_delete_wildcard(self):
+        nested_path = "representatives.nodes.*.vote_weight_percent"
+        nested_value = None
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        for node in loaded_config["representatives"]["nodes"]:
+            node.pop("vote_weight_percent"
+                     ) if "vote_weight_percent" in node else None
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_modify_wildcard(self):
+        nested_path = "representatives.nodes.*.vote_weight_percent"
+        nested_value = 33
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        for node in loaded_config["representatives"]["nodes"]:
+            node["vote_weight_percent"] = nested_value
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_insert_nested_key(self):
+        nested_path = "representatives.ney_key"
+        nested_value = "some_value/with_sp@cial_cHars"
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        loaded_config["representatives"]["ney_key"] = nested_value
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_modify_nested_key(self):
+        nested_path = "representatives.docker_tag"
+        nested_value = "ok"
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        loaded_config["representatives"]["docker_tag"] = nested_value
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_delete_nested_key(self):
+        nested_path = "representatives.docker_tag"
+        nested_value = None
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        loaded_config["representatives"].pop("docker_tag")
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_insert_flat(self):
+        nested_path = "new_key"
+        nested_value = "some_value/with_sp@cial_cHars"
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        loaded_config["new_key"] = nested_value
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_modify_flat(self):
+        nested_path = "nanolooker_enable"
+        nested_value = True
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        loaded_config["nanolooker_enable"] = nested_value
+
+        assert loaded_config == modified_config.data
+
+    def test_conf_edit_delete_flat(self):
+        nested_path = "nanolooker_enable"
+        nested_value = None
+
+        loaded_config, modified_config = self._load_modify_conf_edit(
+            nested_path, nested_value)
+
+        # Add the new key-value pair to each node in the loaded_config
+        loaded_config.pop(nested_path)
+
+        assert loaded_config == modified_config.data
 
 
 if __name__ == '__main__':

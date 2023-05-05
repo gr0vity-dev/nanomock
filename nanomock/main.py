@@ -17,8 +17,8 @@ def main():
     parser.add_argument('command',
                         choices=[
                             'create', 'start', 'status', 'restart', 'init',
-                            'stop', 'update', 'remove', 'reset', 'down',
-                            'destroy', 'rpc'
+                            'init_wallets', 'conf_edit', 'stop', 'update',
+                            'remove', 'reset', 'down', 'destroy', 'rpc'
                         ])
     parser.add_argument('--dir_path',
                         default=_get_default_app_dir(),

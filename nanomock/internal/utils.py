@@ -2,7 +2,7 @@ import os
 import subprocess
 import functools
 import logging
-from typing import Callable, List
+from typing import Callable, List, Any, Tuple
 from importlib.metadata import version, PackageNotFoundError
 from importlib import resources
 from pathlib import Path
@@ -56,16 +56,18 @@ logger = NanoLocalLogger.get_logger(__name__)
 def log_on_success(func: Callable) -> Callable:
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs) -> Any:
         result = func(*args, **kwargs)
 
-        if result is None:
-            log_message = func.__name__
+        if isinstance(result, tuple) and len(result) == 2:
+            value, log_message = result
+            logger.success(log_message)
+            return value
+        elif result is None:
+            logger.success(func.__name__)
+            return None
         else:
-            log_message = result
-
-        logger.success(log_message)
-        return result
+            return result
 
     return wrapper
 
