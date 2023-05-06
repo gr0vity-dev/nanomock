@@ -373,7 +373,7 @@ class ConfigParser:
                                 nested_path: str,
                                 nested_value: str,
                                 save: bool = True):
-        config_nested = NestedData(copy.deepcopy(self.config_dict))
+        config_nested = NestedData(self.conf_rw.read_toml(self.nl_config_path))
 
         if nested_value is None:
             config_nested.merge("DELETE_ME", nested_path)

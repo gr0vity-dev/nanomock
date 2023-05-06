@@ -21,16 +21,19 @@ class TestConfigParser(unittest.TestCase):
         return extracted_values
 
     def _load_modify_conf_edit(self, nested_path, nested_value):
-        config_parser = ConfigParser("unit_tests/configs/mock_nl_config",
-                                     config_file="conf_edit_config.toml")
+        conf_dir = "unit_tests/configs/mock_nl_config"
+        conf_name = "conf_edit_config.toml"
+
+        config_parser = ConfigParser(conf_dir, conf_name)
         modified_config = config_parser.modify_nanolocal_config(nested_path,
                                                                 nested_value,
                                                                 save=False)
-        return config_parser.config_dict, modified_config.data
+        conf_file = config_parser.conf_rw.read_toml(f"{conf_dir}/{conf_name}")
+
+        return conf_file, modified_config.data
 
     def test_parse_default_path(self):
-        config_parser = ConfigParser("unit_tests/configs",
-                                     config_file="nl_config.toml")
+        config_parser = ConfigParser("unit_tests/configs", "nl_config.toml")
         config_parser.config_dict.pop("tcpdump_filename")
         with open('unit_tests/data/expected_nl_config.json', 'r') as f:
             expected_dict = json.load(f)
@@ -40,7 +43,7 @@ class TestConfigParser(unittest.TestCase):
     def test_mock_conf_blkio_disk_cpu_mem(self):
         #This will test that "disk"
         config_parser = ConfigParser("unit_tests/configs/mock_nl_config",
-                                     config_file="blkio_disk_cpu_mem.toml")
+                                     "blkio_disk_cpu_mem.toml")
         config_parser.set_docker_compose()
         extracted_values = self._extract_blkio_config_from_compose_dict(
             config_parser.compose_dict)
@@ -53,7 +56,7 @@ class TestConfigParser(unittest.TestCase):
     def test_mock_bitmath_conversion(self):
         #This will test that "disk"
         config_parser = ConfigParser("unit_tests/configs/mock_nl_config",
-                                     config_file="bitmath_conversion.toml")
+                                     "bitmath_conversion.toml")
         config_parser.set_docker_compose()
         extracted_values = self._extract_blkio_config_from_compose_dict(
             config_parser.compose_dict)
