@@ -26,10 +26,11 @@ class TestConfigParser(unittest.TestCase):
         modified_config = config_parser.modify_nanolocal_config(nested_path,
                                                                 nested_value,
                                                                 save=False)
-        return config_parser.config_dict, modified_config
+        return config_parser.config_dict, modified_config.data
 
     def test_parse_default_path(self):
-        config_parser = ConfigParser("unit_tests/configs")
+        config_parser = ConfigParser("unit_tests/configs",
+                                     config_file="nl_config.toml")
         config_parser.config_dict.pop("tcpdump_filename")
         with open('unit_tests/data/expected_nl_config.json', 'r') as f:
             expected_dict = json.load(f)
@@ -73,7 +74,7 @@ class TestConfigParser(unittest.TestCase):
         for node in loaded_config["representatives"]["nodes"]:
             node["new_key"] = nested_value
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_delete_wildcard(self):
         nested_path = "representatives.nodes.*.vote_weight_percent"
@@ -87,7 +88,7 @@ class TestConfigParser(unittest.TestCase):
             node.pop("vote_weight_percent"
                      ) if "vote_weight_percent" in node else None
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_modify_wildcard(self):
         nested_path = "representatives.nodes.*.vote_weight_percent"
@@ -99,7 +100,7 @@ class TestConfigParser(unittest.TestCase):
         for node in loaded_config["representatives"]["nodes"]:
             node["vote_weight_percent"] = nested_value
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_insert_nested_key(self):
         nested_path = "representatives.ney_key"
@@ -111,7 +112,7 @@ class TestConfigParser(unittest.TestCase):
         # Add the new key-value pair to each node in the loaded_config
         loaded_config["representatives"]["ney_key"] = nested_value
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_modify_nested_key(self):
         nested_path = "representatives.docker_tag"
@@ -123,7 +124,7 @@ class TestConfigParser(unittest.TestCase):
         # Add the new key-value pair to each node in the loaded_config
         loaded_config["representatives"]["docker_tag"] = nested_value
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_delete_nested_key(self):
         nested_path = "representatives.docker_tag"
@@ -135,7 +136,7 @@ class TestConfigParser(unittest.TestCase):
         # Add the new key-value pair to each node in the loaded_config
         loaded_config["representatives"].pop("docker_tag")
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_insert_flat(self):
         nested_path = "new_key"
@@ -147,7 +148,7 @@ class TestConfigParser(unittest.TestCase):
         # Add the new key-value pair to each node in the loaded_config
         loaded_config["new_key"] = nested_value
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_modify_flat(self):
         nested_path = "nanolooker_enable"
@@ -159,7 +160,7 @@ class TestConfigParser(unittest.TestCase):
         # Add the new key-value pair to each node in the loaded_config
         loaded_config["nanolooker_enable"] = nested_value
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
     def test_conf_edit_delete_flat(self):
         nested_path = "nanolooker_enable"
@@ -171,7 +172,7 @@ class TestConfigParser(unittest.TestCase):
         # Add the new key-value pair to each node in the loaded_config
         loaded_config.pop(nested_path)
 
-        assert loaded_config == modified_config.data
+        assert loaded_config == modified_config
 
 
 if __name__ == '__main__':

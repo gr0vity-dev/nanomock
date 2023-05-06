@@ -6,12 +6,15 @@ from nanomock.internal.utils import NanoLocalLogger
 
 class InitialBlocks:
 
-    def __init__(self, data_dir, rpc_url, logger: NanoLocalLogger = None):
+    def __init__(self,
+                 config_parser: ConfigParser,
+                 rpc_url,
+                 logger: NanoLocalLogger = None):
         if logger is None:
             logger = NanoLocalLogger.get_logger(__name__)
         self.logger = logger
         self.api = NanoRpc(rpc_url)
-        self.config = ConfigParser(data_dir)
+        self.conf_p = config_parser
 
     def __epoch_link(self, epoch: int):
         message = f"epoch v{epoch} block"
@@ -22,12 +25,12 @@ class InitialBlocks:
     def __publish_epochs(self):
         e = 1
         self.__log_active_difficulty()
-        while e <= self.config.get_all()["epoch_count"]:
+        while e <= self.conf_p.get_all()["epoch_count"]:
             link = self.__epoch_link(e)
             epoch_block = self.api.create_epoch_block(
                 link,
-                self.config.get_genesis_account_data()["private"],
-                self.config.get_genesis_account_data()["account"],
+                self.conf_p.get_genesis_account_data()["private"],
+                self.conf_p.get_genesis_account_data()["account"],
             )
             self.logger.append_log(
                 "InitialBlocks", "INFO",
@@ -46,61 +49,61 @@ class InitialBlocks:
 
     def __publish_canary(self):
         fv_canary_send_block = self.api.create_send_block_pkey(
-            self.config.get_genesis_account_data()["private"],
-            self.config.get_canary_account_data()["account"], 1)
+            self.conf_p.get_genesis_account_data()["private"],
+            self.conf_p.get_canary_account_data()["account"], 1)
         self.logger.append_log(
             "InitialBlocks", "INFO",
             "SEND FINAL VOTES CANARY BLOCK FROM {} To {} : HASH {}".format(
-                self.config.get_genesis_account_data()["account"],
-                self.config.get_canary_account_data()["account"],
+                self.conf_p.get_genesis_account_data()["account"],
+                self.conf_p.get_canary_account_data()["account"],
                 fv_canary_send_block["hash"]))
 
         fv_canary_open_block = self.api.create_open_block(
-            self.config.get_canary_account_data()["account"],
-            self.config.get_canary_account_data()["private"], 1,
-            self.config.get_genesis_account_data()["account"],
+            self.conf_p.get_canary_account_data()["account"],
+            self.conf_p.get_canary_account_data()["private"], 1,
+            self.conf_p.get_genesis_account_data()["account"],
             fv_canary_send_block["hash"])
         self.logger.append_log(
             "InitialBlocks", "INFO",
             "OPENED CANARY ACCOUNT {} : HASH {}".format(
-                self.config.get_canary_account_data()["account"],
+                self.conf_p.get_canary_account_data()["account"],
                 fv_canary_open_block["hash"]))
 
     def __send_to_burn(self):
-        if "burn_amount" not in self.config.get_all():
+        if "burn_amount" not in self.conf_p.get_all():
             self.logger.debug("[burn_amount] is not set. exit send_to_burn()")
             return False
 
         genesis_balance = int(
-            self.api.check_balance(self.config.get_genesis_account_data()
+            self.api.check_balance(self.conf_p.get_genesis_account_data()
                                    ["account"])["balance_raw"])
-        if int(self.config.get_all()["burn_amount"]) > genesis_balance:
+        if int(self.conf_p.get_all()["burn_amount"]) > genesis_balance:
             self.logger.append_log(
                 "InitialBlocks", "WARNING",
                 "[burn_amount] exceeds genesis balance. exit send_to_burn()")
             return False
 
         send_block = self.api.create_send_block_pkey(
-            self.config.get_genesis_account_data()["private"],
-            self.config.get_burn_account_data()["account"],
-            self.config.get_all()["burn_amount"])
+            self.conf_p.get_genesis_account_data()["private"],
+            self.conf_p.get_burn_account_data()["account"],
+            self.conf_p.get_all()["burn_amount"])
 
         self.logger.append_log(
             "InitialBlocks", "INFO",
             "SENT {:>40} FROM {} To {} : HASH {}".format(
                 send_block["amount_raw"],
-                self.config.get_genesis_account_data()["account"],
-                self.config.get_burn_account_data()["account"],
+                self.conf_p.get_genesis_account_data()["account"],
+                self.conf_p.get_burn_account_data()["account"],
                 send_block["hash"]))
 
     def __convert_weight_percentage_to_balance(self):
         genesis_balance = int(
             self.api.check_balance(
-                self.config.get_genesis_account_data()["account"],
+                self.conf_p.get_genesis_account_data()["account"],
                 include_only_confirmed=False)["balance_raw"])
         genesis_remaing = genesis_balance
 
-        for node_conf in self.config.get_nodes_config():
+        for node_conf in self.conf_p.get_nodes_config():
 
             if "vote_weight_percent" not in node_conf and "balance" not in node_conf:
                 continue  #skip genesis that was added as node
@@ -114,7 +117,7 @@ class InitialBlocks:
                     "InitialBlocks", "WARNING",
                     f'No Genesis funds remaining! Account [{node_conf["account_data"]["account"]}] will not be opened!'
                 )
-                #self.config["node_account_data"].remove(node_account_data)
+                #self.conf_p["node_account_data"].remove(node_account_data)
                 continue
             if genesis_remaing < node_conf["balance"]:
                 self.logger.append_log(
@@ -122,13 +125,13 @@ class InitialBlocks:
                     f'Genesis remaining balance is too small! Send {genesis_remaing} instead of {node_conf["balance"]}.'
                 )
 
-            self.config.set_node_balance(
+            self.conf_p.set_node_balance(
                 node_conf["name"], min(node_conf["balance"], genesis_remaing))
             genesis_remaing = max(0, genesis_remaing - node_conf["balance"])
 
     def __send_vote_weigh(self):
 
-        for node_conf in self.config.get_nodes_config():
+        for node_conf in self.conf_p.get_nodes_config():
 
             if "balance" not in node_conf:
 
@@ -136,14 +139,14 @@ class InitialBlocks:
             node_account_data = node_conf["account_data"]
 
             send_block = self.api.create_send_block_pkey(
-                self.config.get_genesis_account_data()["private"],
+                self.conf_p.get_genesis_account_data()["private"],
                 node_account_data["account"], node_conf["balance"])
 
             self.logger.append_log(
                 "InitialBlocks", "INFO",
                 "SENT {:>40} FROM {} To {} : HASH {}".format(
                     send_block["amount_raw"],
-                    self.config.get_genesis_account_data()["account"],
+                    self.conf_p.get_genesis_account_data()["account"],
                     node_account_data["account"], send_block["hash"]))
 
             open_block = self.api.create_open_block(

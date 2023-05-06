@@ -4,7 +4,7 @@ import subprocess
 import logging
 from typing import List, Optional
 from .internal.dependency_checker import DependencyChecker
-from .modules.nl_parse_config import ConfigParser
+from .modules.nl_parse_config import ConfigParser, ConfigReadWrite
 from .internal.nl_initialise import InitialBlocks
 from .docker import create_docker_interface
 from .modules.nl_rpc import NanoRpc
@@ -22,9 +22,12 @@ logger = NanoLocalLogger.get_logger(__name__)
 
 class NanoLocalManager:
 
-    def __init__(self, dir_path, project_name):
+    def __init__(self, dir_path, project_name, config_file="nl_config.toml"):
         self.command_mapping = self._initialize_command_mapping()
-        self.conf_p = ConfigParser(dir_path, logger=logger)
+        self.conf_p = ConfigParser(dir_path,
+                                   config_file=config_file,
+                                   logger=logger)
+        self.conf_rw = ConfigReadWrite(dir_path)
         self.dependency_checker = DependencyChecker()
         self.dependency_checker.check_dependencies()
 
@@ -68,26 +71,24 @@ class NanoLocalManager:
         if config_name == "config_node":
             default_config_path = os.path.join(self.services_dir,
                                                "default_config-node.toml")
-            return self.conf_p.conf_rw.read_toml(default_config_path,
-                                                 is_packaged=True)
+            return self.conf_rw.read_toml(default_config_path,
+                                          is_packaged=True)
         elif config_name == "config_rpc":
             default_rpc_path = os.path.join(self.services_dir,
                                             "default_config-rpc.toml")
-            return self.conf_p.conf_rw.read_toml(default_rpc_path,
-                                                 is_packaged=True)
+            return self.conf_rw.read_toml(default_rpc_path, is_packaged=True)
         else:
             return {}
 
     def _generate_docker_compose_env_file(self):
         env_variables = self.conf_p.get_docker_compose_env_variables()
-        self.conf_p.conf_rw.write_list(f'{self.compose_env_path}',
-                                       env_variables)
+        self.conf_rw.write_list(f'{self.compose_env_path}', env_variables)
 
     def _generate_docker_compose_yml_file(self):
         self.conf_p.set_docker_compose()
         self.conf_p.write_docker_compose()
 
-    def _generate_config_node_file(self, node_name):
+    def _set_config_node_file(self, node_name):
         config_node = self.conf_p.get_config_from_path(node_name,
                                                        "config_node_path")
         if config_node is None:
@@ -97,7 +98,13 @@ class NanoLocalManager:
 
         config_node["node"][
             "preconfigured_peers"] = self.conf_p.preconfigured_peers
-        self.conf_p.conf_rw.write_toml(
+        config_node["node"]["enable_voting"] = self.conf_p.is_voting_enabled(
+            node_name)
+        return config_node
+
+    def _generate_config_node_file(self, node_name):
+        config_node = self._set_config_node_file(node_name)
+        self.conf_rw.write_toml(
             self.config_node_path.format(node_name=node_name), config_node)
 
     def _generate_config_rpc_file(self, node_name):
@@ -108,7 +115,7 @@ class NanoLocalManager:
                 "No config-rpc.toml found. minimal version was created")
             config_rpc = self._get_default("config_rpc")
 
-        self.conf_p.conf_rw.write_toml(
+        self.conf_rw.write_toml(
             self.config_rpc_path.format(node_name=node_name), config_rpc)
 
     def _generate_nanomonitor_config_file(self, node_name):
@@ -344,7 +351,7 @@ class NanoLocalManager:
     @log_on_success
     def init_wallets(self):
         #self.start_nodes('all')  #fixes a bug on mac m1
-        init_blocks = InitialBlocks(self.dir_path,
+        init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
         for node_name in self.conf_p.get_nodes_name():
             if node_name == self.conf_p.get_genesis_node_name():
@@ -363,7 +370,7 @@ class NanoLocalManager:
     @log_on_success
     def init_nodes(self):
         self.init_wallets()
-        init_blocks = InitialBlocks(self.dir_path,
+        init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
         return init_blocks.publish_initial_blocks()
 

@@ -89,7 +89,7 @@ class ConfigParser:
 
     preconfigured_peers = []
 
-    def __init__(self, app_dir, config_file=None, logger=None):
+    def __init__(self, app_dir, config_file, logger=None):
         self.logger = logger or NanoLocalLogger.get_logger(__name__)
 
         self.enabled_services = []
@@ -110,8 +110,6 @@ class ConfigParser:
 
     def _set_path_variables(self, app_dir, config_file):
         user_app_dir = Path(app_dir).resolve()
-        if config_file is None:
-            config_file = "nl_config.toml"
 
         if is_packaged_version():
             self.services_dir = "nanomock.internal.data.services"
@@ -351,6 +349,14 @@ class ConfigParser:
             return True
         return False
 
+    def is_voting_enabled(self, node_name):
+        node_conf = self.get_node_config(node_name)
+        if node_conf:
+            return node_conf.get("enable_voting", True)
+        raise ValueError(
+            f"{node_name} undefined in {self.nl_config_path}\nValid names:{self.get_nodes_name()}"
+        )
+
     def _remove_keys_with_value(self, d, k, val):
         #if dict (d), search for key (k) that has value (val) and remove key-value pairfrom dict
         if k in d and d[k] == val:
@@ -383,6 +389,9 @@ class ConfigParser:
             self.conf_rw.write_toml(self.nl_config_path, config_nested.data)
 
         return config_nested
+
+    def get_config_reader_writer(self):
+        return self.conf_rw
 
     def set_prom_runid(self, runid):
         self.runid = runid

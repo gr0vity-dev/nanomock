@@ -4,7 +4,7 @@ from nanomock.internal.nl_block_tools import BlockReadWrite
 import json
 
 
-class TestRefactoredCode(unittest.TestCase):
+class TestBlockTools(unittest.TestCase):
 
     def setUp(self):
         self.block_rw = BlockReadWrite("unit_tests/configs/nl_config.toml")
