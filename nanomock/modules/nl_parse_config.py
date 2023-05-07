@@ -27,12 +27,6 @@ def str2bool(v):
 
 class ConfigReadWrite:
 
-    def __init__(self, config_path, logger=None):
-        if logger is None:
-            self.logger = NanoLocalLogger.get_logger(__name__)
-        if not os.path.exists(config_path):
-            raise FileExistsError(config_path)
-
     @read_from_package_if_needed
     def read_json(self, path, is_packaged=False):
         with open(path, "r") as f:
@@ -50,7 +44,7 @@ class ConfigReadWrite:
                 toml_dict = tomli.load(f)
                 return toml_dict
         except tomli.TOMLDecodeError as e:
-            self.logger.error("Invalid config file! \n {}".format(str(e)))
+            raise FileExistsError("Invalid config file! \n {}".format(str(e)))
 
     @read_from_package_if_needed
     def read_yaml(self, path, is_packaged=False):
@@ -94,7 +88,7 @@ class ConfigParser:
 
         self.enabled_services = []
         self._set_path_variables(app_dir, config_file)
-        self.conf_rw = ConfigReadWrite(self.nl_config_path)
+        self.conf_rw = ConfigReadWrite()
         self.nano_lib = NanoLibTools()
         self.config_dict = self.conf_rw.read_toml(self.nl_config_path)
         self.compose_dict = self.conf_rw.read_yaml(self.default_compose_path,

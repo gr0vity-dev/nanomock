@@ -67,6 +67,7 @@ def log_on_success(func: Callable) -> Callable:
             logger.success(func.__name__)
             return None
         else:
+            logger.success(result)
             return result
 
     return wrapper

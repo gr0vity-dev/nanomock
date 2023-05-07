@@ -6,6 +6,7 @@ import pytest
 from typing import Tuple
 from subprocess import CalledProcessError
 import re
+from pathlib import Path
 
 
 @pytest.fixture(scope="class", autouse=True)
@@ -127,3 +128,27 @@ class TestMockNetwork:
 #     with open('unit_tests/data/expected_network_status_2.txt', 'r') as f:
 #         expected_network_status = f.read()
 #     assert status == expected_network_status
+
+    def test_network_ldb_exists(self):
+        nano_nodes_path = Path("unit_tests/configs/nano_nodes")
+
+        keep_file_path = nano_nodes_path / "keep.ldb"
+        keep_file_path.touch()
+        data_files = list(nano_nodes_path.glob('**/data.ldb'))
+        wallet_files = list(nano_nodes_path.glob('**/wallets.ldb'))
+        assert data_files
+        assert wallet_files
+        assert keep_file_path.exists()
+
+    def test_network_reset(self):
+        nano_nodes_path = Path("unit_tests/configs/nano_nodes")
+        self.manager.reset_nodes_data()
+
+        keep_file_path = nano_nodes_path / "keep.ldb"
+        data_files = list(nano_nodes_path.glob('**/data.ldb'))
+        wallet_files = list(nano_nodes_path.glob('**/wallets.ldb'))
+
+        # Assert keep.ldb is still there
+        assert keep_file_path.exists()
+        assert not data_files
+        assert not wallet_files

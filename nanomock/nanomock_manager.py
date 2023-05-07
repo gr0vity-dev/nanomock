@@ -1,6 +1,5 @@
 import os
-import re
-import subprocess
+from pathlib import Path
 import logging
 from typing import List, Optional
 from .internal.dependency_checker import DependencyChecker
@@ -12,7 +11,6 @@ from .internal.utils import log_on_success, NanoLocalLogger, shutil_rmtree, extr
 from typing import List, Dict, Optional, Tuple, Union
 import concurrent.futures
 from math import floor
-import yaml
 import json
 import time
 import inspect
@@ -27,7 +25,7 @@ class NanoLocalManager:
         self.conf_p = ConfigParser(dir_path,
                                    config_file=config_file,
                                    logger=logger)
-        self.conf_rw = ConfigReadWrite(dir_path)
+        self.conf_rw = ConfigReadWrite()
         self.dependency_checker = DependencyChecker()
         self.dependency_checker.check_dependencies()
 
@@ -287,7 +285,6 @@ class NanoLocalManager:
             return f"{online_count}/{total_nodes} containers online"
 
     def conf_edit(self, payload):
-        print(payload)
         self.conf_p.modify_nanolocal_config(payload["path"], payload["value"])
         return True
 
@@ -315,7 +312,7 @@ class NanoLocalManager:
         self._generate_docker_compose_yml_file()
         logger.success(
             f"Docker Compose file created at {self.compose_yml_path}")
-        return "\n".join(self.conf_p.get_enabled_services())
+        return None, "\n".join(self.conf_p.get_enabled_services())
 
     def _validator_rpc(self, nodes=None, payload=None):
         if not payload:
@@ -324,7 +321,6 @@ class NanoLocalManager:
         return nodes, payload
 
     def _validator_conf_edit(self, nodes=None, payload=None):
-        print("_validator_conf_edit", payload)
         if payload is None:
             raise ValueError(
                 "payload must be provided '{\"path\" : ... , \"value\": ...}'")
@@ -346,7 +342,7 @@ class NanoLocalManager:
             response = node_rpc.post_with_auth(payload)
             responses.append(response)
 
-        return json.dumps(responses, indent=2)
+        return None, json.dumps(responses, indent=2)
 
     @log_on_success
     def init_wallets(self):
@@ -365,6 +361,8 @@ class NanoLocalManager:
                     self.conf_p.get_node_config(node_name)["rpc_url"],
                     node_name,
                     seed=self.conf_p.get_node_config(node_name)["seed"])
+
+        #return without logging for unit tests
         return init_blocks.logger.pop("InitialBlocks")
 
     @log_on_success
@@ -378,10 +376,15 @@ class NanoLocalManager:
     def reset_nodes_data(self, nodes: Optional[List[str]] = None):
         self.stop_containers(nodes)
         nodes_to_process = nodes or ['.']
+
         for node in nodes_to_process:
-            node_path = f'{self.nano_nodes_path}/{node}' if nodes else self.nano_nodes_path
-            cmd = 'rm -f $(find . -name "*.ldb")'
-            subprocess_run_capture_output(cmd, node_path)
+            node_path = Path(self.nano_nodes_path) / node if nodes else Path(
+                self.nano_nodes_path)
+            files_to_remove = ['data.ldb', 'wallets.ldb']
+
+            for file_pattern in files_to_remove:
+                for file_path in node_path.rglob(file_pattern):
+                    file_path.unlink()
 
     def init_containers(self):
         self.create_docker_compose_file()

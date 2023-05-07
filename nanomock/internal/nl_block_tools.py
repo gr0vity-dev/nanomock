@@ -579,8 +579,8 @@ class BlockAsserts():
 
 class BlockReadWrite():
 
-    def __init__(self, nl_conf_path):
-        self.conf_rw = ConfigReadWrite(nl_conf_path)
+    def __init__(self):
+        self.conf_rw = ConfigReadWrite()
 
     def read_blocks_from_disk(self,
                               path,
