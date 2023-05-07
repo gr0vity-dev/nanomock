@@ -50,12 +50,14 @@ class NanoLocalManager:
         return {
             'create': (self.create_docker_compose_file, None),
             'start': (self.start_containers, None),
+            'start_nodes': (self.start_all_nodes, None),
             'status': (self.network_status, None),
             'restart': (self.restart_containers, None),
             'reset': (self.reset_nodes_data, None),
             'init': (self.init_nodes, None),
             'init_wallets': (self.init_wallets, None),
             'stop': (self.stop_containers, None),
+            'stop_nodes': (self.stop_all_nodes, None),
             'remove': (self.remove_containers, None),
             'down': (self.remove_containers, None),
             'destroy': (lambda: self.destroy(remove_files=True), None),
@@ -246,9 +248,7 @@ class NanoLocalManager:
                                    max_timeout_s: int = 15) -> None:
         start_time = time.time()
 
-        if not nodes_name:
-            nodes_name = self.conf_p.get_nodes_name()
-
+        nodes_name = nodes_name or self.conf_p.get_nodes_name()
         nodes_to_check = nodes_name.copy()
 
         def get_unavailable_nodes(nodes: List[str], timeout: int) -> List[str]:
@@ -404,12 +404,29 @@ class NanoLocalManager:
         self._wait_for_rpc_availability(nodes)
 
     @log_on_success
+    def start_all_nodes(self):
+        nodes = self.conf_p.get_nodes_name()
+        self.docker_interface.compose_start(nodes)
+        self._wait_for_rpc_availability(nodes)
+
+    @log_on_success
     def stop_containers(self, nodes: Optional[List[str]] = None):
+        #by default, stops all containers (also services like nanolooker, monitor or prom-exporter)
+        self.docker_interface.compose_stop(nodes)
+
+    @log_on_success
+    def stop_all_nodes(self):
+        #stops all nodes but leaves services running
+        nodes = self.conf_p.get_nodes_name()
         self.docker_interface.compose_stop(nodes)
 
     @log_on_success
     def remove_containers(self):
+        containers = self.conf_p.get_conatiners_name()
         self.docker_interface.compose_down()
+        started_count = self.docker_interface.container_count(containers)
+        removed_count = len(containers) - started_count
+        return f"{removed_count} containers have been removed"
 
     @log_on_success
     def destroy(self, remove_files=False):

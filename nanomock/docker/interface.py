@@ -44,3 +44,7 @@ class DockerInterface(ABC):
     @abstractmethod
     def compose_pull(self):
         pass
+
+    @abstractmethod
+    def container_count(self, container_names):
+        pass

@@ -16,9 +16,10 @@ def main():
     parser = argparse.ArgumentParser(description='nanomock cli')
     parser.add_argument('command',
                         choices=[
-                            'create', 'start', 'status', 'restart', 'init',
-                            'init_wallets', 'conf_edit', 'stop', 'update',
-                            'remove', 'reset', 'down', 'destroy', 'rpc'
+                            'create', 'start', 'start_nodes', 'status',
+                            'restart', 'init', 'init_wallets', 'conf_edit',
+                            'stop', 'stop_nodes', 'update', 'remove', 'reset',
+                            'down', 'destroy', 'rpc'
                         ])
     parser.add_argument('--dir_path',
                         default=_get_default_app_dir(),

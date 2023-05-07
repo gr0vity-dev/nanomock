@@ -82,3 +82,19 @@ class DockerMixin(DockerInterface):
     def compose_pull(self):
         cmd = self._get_docker_compose_command(["pull"])
         return self._run_command(cmd)
+
+    def container_count(self, container_names):
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}"],
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+
+        existing_container_names = result.stdout.strip().split("\n")
+
+        count = 0
+        for name in container_names:
+            if name in existing_container_names:
+                count += 1
+
+        return count

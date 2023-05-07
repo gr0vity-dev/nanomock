@@ -597,6 +597,13 @@ class ConfigParser:
             response.append(node["name"])
         return response
 
+    def get_conatiners_name(self):
+        if not os.path.exists(self.compose_out_path):
+            return []
+
+        compose_config = self.conf_rw.read_yaml(self.compose_out_path)
+        return [service for service in compose_config["services"].keys()]
+
     def get_nodes_config(self):
         res = []
         for node_name in self.get_nodes_name():
