@@ -113,22 +113,6 @@ class TestMockNetwork:
             pattern, log_output
         ), f"Log output '{log_output}' does not match the expected pattern"
 
-    # def test_network_init(self):
-    #     self.manager.init_nodes()
-    #     status = self.manager.network_status()
-    #     with open('unit_tests/data/expected_network_status_init.txt',
-    #               'r') as f:
-    #         expected_network_status = f.read()
-    #     assert status == expected_network_status
-
-
-# def test_network_status_2(manager: NanoLocalManager, nano_rpc: NanoRpc):
-#     manager.stop_containers(["unittest_pr2"])
-#     status = manager.network_status()
-#     with open('unit_tests/data/expected_network_status_2.txt', 'r') as f:
-#         expected_network_status = f.read()
-#     assert status == expected_network_status
-
     def test_network_ldb_exists(self):
         nano_nodes_path = Path("unit_tests/configs/nano_nodes")
 

@@ -1,11 +1,11 @@
 import re
-from nanomock.internal.utils import subprocess_run_capture_output, NanoLocalLogger
+from nanomock.internal.utils import subprocess_run_capture_output, get_mock_logger
 from subprocess import CalledProcessError
 
 
 class DockerAutoHeal():
 
-    logger = NanoLocalLogger.get_logger(__name__)
+    logger = get_mock_logger()
 
     def __init__(self, max_heal_attampts=10):
         self.max_heal_attemps = max_heal_attampts

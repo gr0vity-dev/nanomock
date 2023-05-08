@@ -2,17 +2,20 @@ import argparse
 from nanomock.nanomock_manager import NanoLocalManager
 from nanomock.internal.utils import is_packaged_version
 from pathlib import Path
+from os import environ
 import json
 
 
 def _get_default_app_dir():
+    if environ.get("NL_CONF_DIR"):
+        return Path(environ.get("NL_CONF_DIR"))
     if is_packaged_version():
         return Path.cwd()
     else:
         return Path.cwd() / 'nanomock'
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description='nanomock cli')
     parser.add_argument('command',
                         choices=[
@@ -21,7 +24,7 @@ def main():
                             'stop', 'stop_nodes', 'update', 'remove', 'reset',
                             'down', 'destroy', 'rpc'
                         ])
-    parser.add_argument('--dir_path',
+    parser.add_argument('--path',
                         default=_get_default_app_dir(),
                         help='Path to the working directory')
     parser.add_argument(
@@ -41,8 +44,13 @@ def main():
         type=json.loads,
         help="JSON request payload (only required for rpc command)")
 
-    args = parser.parse_args()
-    manager = NanoLocalManager(args.dir_path, args.project_name)
+    return parser.parse_args()
+
+
+def main(args=None):
+    args = args or parse_args()
+    manager = NanoLocalManager(args.path, args.project_name,
+                               environ.get("NL_CONF_FILE", "nl_config.toml"))
 
     manager.execute_command(args.command, args.nodes, args.payload)
 

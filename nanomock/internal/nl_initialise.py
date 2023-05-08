@@ -1,17 +1,13 @@
 from nanomock.modules.nl_rpc import NanoRpc
 from nanomock.modules.nl_nanolib import raw_high_precision_percent
 from nanomock.modules.nl_parse_config import ConfigParser
-from nanomock.internal.utils import NanoLocalLogger
+from nanomock.internal.utils import get_mock_logger
 
 
 class InitialBlocks:
 
-    def __init__(self,
-                 config_parser: ConfigParser,
-                 rpc_url,
-                 logger: NanoLocalLogger = None):
-        if logger is None:
-            logger = NanoLocalLogger.get_logger(__name__)
+    def __init__(self, config_parser: ConfigParser, rpc_url, logger=None):
+        logger = logger or get_mock_logger()
         self.logger = logger
         self.api = NanoRpc(rpc_url)
         self.conf_p = config_parser

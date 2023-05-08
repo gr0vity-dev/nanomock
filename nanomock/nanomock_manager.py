@@ -7,7 +7,7 @@ from .modules.nl_parse_config import ConfigParser, ConfigReadWrite
 from .internal.nl_initialise import InitialBlocks
 from .docker import create_docker_interface
 from .modules.nl_rpc import NanoRpc
-from .internal.utils import log_on_success, NanoLocalLogger, shutil_rmtree, extract_packaged_services_to_disk, subprocess_run_capture_output
+from .internal.utils import log_on_success, get_mock_logger, shutil_rmtree, extract_packaged_services_to_disk, subprocess_run_capture_output
 from typing import List, Dict, Optional, Tuple, Union
 import concurrent.futures
 from math import floor
@@ -15,12 +15,18 @@ import json
 import time
 import inspect
 
-logger = NanoLocalLogger.get_logger(__name__)
+logger = None
+
+
+def init_logger():
+    global logger
+    logger = logger or get_mock_logger()
 
 
 class NanoLocalManager:
 
     def __init__(self, dir_path, project_name, config_file="nl_config.toml"):
+        init_logger()
         self.command_mapping = self._initialize_command_mapping()
         self.conf_p = ConfigParser(dir_path,
                                    config_file=config_file,

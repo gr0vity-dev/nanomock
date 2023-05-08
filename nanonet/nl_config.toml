@@ -11,7 +11,7 @@ NANO_TEST_MAGIC_NUMBER = "LC"
 remote_address = '127.0.0.1' 
 #enables nanolooker block explorer at port 42000.
 #creates mongodb docker container with default port 27017
-nanolooker_enable = false
+nanolooker_enable = true
 #If you change these values, you need to run ./nl_run start --build true
 nanolooker_port = 42000
 nanolooker_node_name = "genesis"

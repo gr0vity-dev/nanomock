@@ -6,17 +6,15 @@ import oyaml as yaml
 import secrets
 import json
 import copy
-import shutil
 
 from datetime import datetime
 from nanolib import Block
 from extradict import NestedData
 from pathlib import Path
-from importlib import resources
 
 from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
 from nanomock.modules.nl_rpc import NanoRpc
-from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version, find_device_for_path, convert_to_bytes, NanoLocalLogger
+from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version, find_device_for_path, convert_to_bytes, get_mock_logger
 from nanomock.internal.feature_toggle import toggle
 from nanomock.docker import get_docker_interface_class
 
@@ -84,7 +82,7 @@ class ConfigParser:
     preconfigured_peers = []
 
     def __init__(self, app_dir, config_file, logger=None):
-        self.logger = logger or NanoLocalLogger.get_logger(__name__)
+        self.logger = logger or get_mock_logger()
 
         self.enabled_services = []
         self._set_path_variables(app_dir, config_file)

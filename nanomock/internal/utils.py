@@ -1,4 +1,3 @@
-import os
 import subprocess
 import functools
 import logging
@@ -14,28 +13,22 @@ import bitmath
 import shutil
 
 
-class NanoLocalLogger(logging.Logger):
+def get_mock_logger():
+    logger.setLevel(logging.INFO)
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+        logger.addHandler(handler)
+    return logger
 
+
+class NanoMockLogger(logging.Logger):
+    LOG_STORE = {}
     SUCCESS_LEVEL_NUM = 25
     logging.addLevelName(SUCCESS_LEVEL_NUM, "SUCCESS")
 
     def success(self, message, *args, **kws):
         self.log(self.SUCCESS_LEVEL_NUM, message, *args, **kws)
-
-    @staticmethod
-    def get_logger(name: str, handler=None):
-        logger = NanoLocalLogger(name)
-        logger.setLevel(logging.INFO)
-
-        if handler is None:
-            handler = logging.StreamHandler()
-            handler.setFormatter(
-                logging.Formatter('%(levelname)s: %(message)s'))
-
-        logger.addHandler(handler)
-        return logger
-
-    LOG_STORE = {}
 
     def dynamic(self, log_level, message):
         log_level = getattr(logger, log_level, logging.INFO)
@@ -50,7 +43,9 @@ class NanoLocalLogger(logging.Logger):
         return self.LOG_STORE.pop(log_key)
 
 
-logger = NanoLocalLogger.get_logger(__name__)
+# Set the custom logger as the root logger
+logging.setLoggerClass(NanoMockLogger)
+logger = logging.getLogger(__name__)
 
 
 def log_on_success(func: Callable) -> Callable:
