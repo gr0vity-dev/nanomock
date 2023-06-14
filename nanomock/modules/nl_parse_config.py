@@ -51,7 +51,7 @@ class ConfigReadWrite:
 
     def write_json(self, path, json_dict):
         with open(path, "w") as f:
-            json.dump(json_dict, f)
+            json.dump(json_dict, f, indent=2)
 
     def append_json(self, path, json_dict):
         with open(path, "a") as f:
@@ -107,6 +107,8 @@ class ConfigParser:
             self.services_dir = "nanomock.internal.data.services"
             self.default_compose_path = f"{self.services_dir}.default_docker-compose.yml"
             self.default_nanomonitor_config = f"{self.services_dir}.nanomonitor.default_config.php"
+            #self.default_nanocap_config = f"{self.services_dir}.nanocap.nanocap.config"
+            #self.default_nanocap_compose = f"{self.services_dir}.nanocap.nanocap-compose.yml"
             self.default_nanomonitor_config = f"{self.services_dir}.nanovotevisu.default_docker-compose.yml"
         else:
             self.services_dir = Path().resolve(
@@ -262,6 +264,15 @@ class ConfigParser:
         #traffic control
         self.config_dict.setdefault(
             "tc_enable", str2bool(self.config_dict.get("tc_enable", False)))
+
+        #privileged
+        self.config_dict.setdefault(
+            "privileged", str2bool(self.config_dict.get("privileged", False)))
+
+        #nanocap
+        self.config_dict.setdefault(
+            "nanocap_enable",
+            str2bool(self.config_dict.get("nanocap_enable", False)))
 
         #tcpdump
         self.config_dict.setdefault(
@@ -434,6 +445,9 @@ class ConfigParser:
                 f'"{env}" is not in the list of accepted valued ["local", "beta", "live"] for variable "env" in nl_config.toml'
             )
         return canary_pub
+
+    def get_network_name(self):
+        return self.compose_dict["networks"]["nano-local"]["name"]
 
     def get_genesis_block(self, as_json=False):
 
@@ -632,14 +646,17 @@ class ConfigParser:
 
         return env_variables
 
+    def set_network_name(self):
+        self.compose_dict["networks"]["nano-local"][
+            "name"] = self.get_node_prefix(
+            ) + self.compose_dict["networks"]["nano-local"]["name"]
+
     def set_docker_compose(self):
         default_service_names = [
             service for service in self.compose_dict["services"]
         ]
 
-        self.compose_dict["networks"]["nano-local"][
-            "name"] = self.get_node_prefix(
-            ) + self.compose_dict["networks"]["nano-local"]["name"]
+        self.set_network_name()
 
         #Add nodes and ports
         for node in self.config_dict["representatives"]["nodes"]:
@@ -663,6 +680,9 @@ class ConfigParser:
 
         if bool(self.get_config_value("tcpdump_enable")):
             self.set_tcpdump_compose()
+
+        if bool(self.get_config_value("nanocap_enable")):
+            self.set_nanocap_compose()
 
         #remove default container
         for service in default_service_names:
@@ -801,6 +821,28 @@ class ConfigParser:
 
             self.enabled_services.append(
                 f'{container_name} added for node {node["name"]}')
+
+    def set_nanocap_device_ip(self, device_ip):
+        nanocap_config_path = self.nano_nodes_path / "services" / "nanocap" / "nanocap.config"
+        nanocap_config = self.conf_rw.read_json(nanocap_config_path)
+        nanocap_config["capture"]["device_ip"] = device_ip
+        nanocap_config = self.conf_rw.write_json(nanocap_config_path,
+                                                 nanocap_config)
+
+    def set_nanocap_compose(self):
+
+        #nanocap_config = self.conf_rw.read_json(self.default_nanocap_config,is_packaged=True)
+
+        nanocap_compose = self.conf_rw.read_yaml(
+            f'{self.services_dir}/nanocap/nanocap-compose.yml',
+            is_packaged=True)
+        container = nanocap_compose["services"]["nanocap"]
+        container_name = f'{self.get_node_prefix()}nanocap'
+        self.compose_dict["services"][container_name] = container
+        self.compose_dict["services"][container_name][
+            "container_name"] = container_name
+        self.enabled_services.append(
+            f'nanocap enabled ! This may lead to a decrease in performance!')
 
     def set_tcpdump_compose(self):
 
@@ -969,6 +1011,8 @@ class ConfigParser:
 
         container_type = self.get_container_type(user_id)
         container = self.compose_add_container(node_name, container_type)
+        if self.config_dict["privileged"]:
+            container["privileged"] = 'true'
 
         if user_id != "1000" or self.config_dict["tc_enable"]:
             container["user"] = user_id

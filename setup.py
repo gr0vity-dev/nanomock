@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name="nanomock",
-      version="0.0.10",
+      version="0.0.11",
       author="gr0vity",
       description="Create local dockerized nano-currency networks",
       long_description=long_description,
@@ -20,6 +20,7 @@ setup(name="nanomock",
           "nanolib",
           "extradict",
           "requests",
+          'bitmath',
       ],
       entry_points={
           'console_scripts': [

@@ -1,0 +1,9 @@
+version: '2.4'
+services:
+  nanocap:
+    image: cryptocode/nanocap
+    container_name: nl_nanocap
+    volumes:
+      - ./services/nanocap/nanocap.config:/nanocap/nanocap.config
+    command: bin/nanocap
+    network_mode: host

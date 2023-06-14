@@ -1,0 +1,23 @@
+genesis_key = "12C91837C846F875F56F67CD83040A832CFC0F131AF3DFF9E502C0D43F5D2D15"
+canary_key = "FB4E458CB13508353C5B2574B82F1D1D61367F61E88707F773F068FF90050BEE"
+epoch_count = 2
+burn_amount = "140282366920938463463374607431768211454"
+NANO_TEST_EPOCH_1 = "0xfff0000000000000"
+NANO_TEST_EPOCH_2 = "0x000000000000000f"
+NANO_TEST_EPOCH_2_RECV = "0x000000000000000f"
+NANO_TEST_MAGIC_NUMBER = "LC"
+
+[representatives]
+node_prefix = "pathenv"
+host_port_peer = 44700
+host_port_rpc = 45700
+host_port_ws = 47700
+docker_tag = "nanocurrency/nano:V24.0"
+device_read_bps = 200
+cpu = 0.5
+memory = "1000MB"
+
+[[representatives.nodes]]
+name = "pr1"
+seed = "1110000000000000000000000000000000000000000000000000000000000001"
+vote_weight_percent = 100

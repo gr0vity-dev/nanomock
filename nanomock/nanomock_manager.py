@@ -316,9 +316,18 @@ class NanoLocalManager:
         self._prepare_nodes()
         self._generate_docker_compose_env_file()
         self._generate_docker_compose_yml_file()
+        self.docker_interface.create_network(self.conf_p.get_network_name())
+        self._initilaise_services_configs(self.conf_p)
+
         logger.success(
             f"Docker Compose file created at {self.compose_yml_path}")
         return None, "\n".join(self.conf_p.get_enabled_services())
+
+    def _initilaise_services_configs(self, config: ConfigParser):
+        if bool(config.get_config_value("nanocap_enable")):
+            network_name = config.get_network_name()
+            device_ip = self.docker_interface.get_network_gateway(network_name)
+            config.set_nanocap_device_ip(device_ip)
 
     def _validator_rpc(self, nodes=None, payload=None):
         if not payload:

@@ -112,7 +112,8 @@
     "prom_runid": "default",
     "tc_enable": false,
     "tcpdump_enable": false,
-    
+    "privileged": false,
+    "nanocap_enable": false,
     "burn_account_data": {
         "account":
         "nano_1111111111111111111111111111111111111111111111111111hifc8npp"

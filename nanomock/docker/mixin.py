@@ -1,6 +1,7 @@
 from .interface import DockerInterface
 from .autoheal import DockerAutoHeal
 import subprocess
+import json
 
 from typing import List, Optional
 from nanomock.internal.utils import subprocess_run_capture_output
@@ -31,12 +32,12 @@ class DockerMixin(DockerInterface):
     def _run_command(self, base_command, auto_heal=True):
         try:
             subprocess_run_capture_output(base_command, True, None)
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError as exc:
             if auto_heal:
                 docker_healer = DockerAutoHeal()
-                response = docker_healer.try_heal(e, True, None)
+                response = docker_healer.retry_heal(exc, True, None)
                 return response
-            raise e
+            raise exc
 
     def restart_container(self,
                           container_name: str,
@@ -98,3 +99,31 @@ class DockerMixin(DockerInterface):
                 count += 1
 
         return count
+
+    def create_network(self, network_name):
+        try:
+            subprocess.run(["docker", "network", "create", network_name],
+                           check=True,
+                           capture_output=True)
+        except subprocess.CalledProcessError as exc:
+            output = exc.stderr.decode()
+            if exc.returncode == 1 and "already exists" in output:
+                print(f"The network '{network_name}' already exists.")
+            else:
+                raise Exception(f"Error creating network: {exc}") from exc
+
+    def get_network_gateway(self, network_name):
+        try:
+            completed_process = subprocess.run(
+                ["docker", "network", "inspect", network_name],
+                capture_output=True,
+                check=True)
+            output = completed_process.stdout.decode()
+            data = json.loads(output)
+            gateway = data[0]['IPAM']['Config'][0]['Gateway']
+            return gateway
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Error inspecting network: {e}") from e
+        except KeyError:
+            raise Exception(
+                "Unable to find the Gateway in the network's IPAM Config.")

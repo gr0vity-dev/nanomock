@@ -48,3 +48,11 @@ class DockerInterface(ABC):
     @abstractmethod
     def container_count(self, container_names):
         pass
+
+    @abstractmethod
+    def create_network(self, network_name):
+        pass
+
+    @abstractmethod
+    def get_network_gateway(self, network_name):
+        pass

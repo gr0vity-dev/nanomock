@@ -7,8 +7,8 @@ class DockerAutoHeal():
 
     logger = get_mock_logger()
 
-    def __init__(self, max_heal_attampts=10):
-        self.max_heal_attemps = max_heal_attampts
+    def __init__(self, max_heal_attempts=10):
+        self.max_heal_attempts = max_heal_attempts
 
     def _get_error_mapping(self):
         error_mapping = {
@@ -20,11 +20,15 @@ class DockerAutoHeal():
                 "error_msg":
                 "Error response from daemon: Conflict. The container name",
                 "heal_method": self._heal_docker_in_use
+            },
+            "file_not_found": {
+                "error_msg": "No such file or directory",
+                "heal_method": self._heal_file_not_found
             }
         }
         return error_mapping
 
-    def is_healable(self, stderr: str):
+    def heal_if_possible(self, error_msg, stderr):
         error_mapping = self._get_error_mapping()
 
         matching_errors = [
@@ -33,12 +37,16 @@ class DockerAutoHeal():
         ]
 
         if matching_errors:
-            error_msg = matching_errors[0]["error_msg"]
             healing_method = matching_errors[0]["heal_method"]
-            healing_method(error_msg, stderr)
-            return True
+            return healing_method(error_msg, stderr)
 
         return False
+
+    def _heal_file_not_found(self, error_msg, stderr):
+        # Here, we are simply logging the error and returning True to indicate the error is healed.
+        self.logger.warning(
+            "Compose file not available. Nothing to take down.")
+        return True
 
     def _heal_address_in_use(self, error_msg, stderr):
         error_msg = "programming external connectivity on endpoint"
@@ -61,17 +69,18 @@ class DockerAutoHeal():
             return True
         return False
 
-    def try_heal(self, error: CalledProcessError, cmd_shell, cmd_cwd):
+    def retry_heal(self, error: CalledProcessError, cmd_shell, cmd_cwd):
         stderr = error.stderr
         attempt = 1
-        if self.is_healable(stderr):
-            while attempt <= self.max_heal_attemps:
-                self.logger.warning("Retry attempt %s\n%s", attempt, stderr)
-                try:
-                    return subprocess_run_capture_output(
-                        error.cmd, cmd_shell, cmd_cwd)
-                except CalledProcessError as heal_error:
-                    self.logger.error("Attempt %s failed\n%s", attempt,
-                                      heal_error.stderr)
-                    attempt += 1
-        raise ValueError(error.stderr)
+        while attempt <= self.max_heal_attempts:
+            if self.heal_if_possible(error.cmd, stderr):
+                return True  # healing was successful
+            self.logger.warning("Retry attempt %s\n%s", attempt, stderr)
+            try:
+                subprocess_run_capture_output(error.cmd, cmd_shell, cmd_cwd)
+            except CalledProcessError as heal_error:
+                self.logger.error("Attempt %s failed\n%s", attempt,
+                                  heal_error.stderr)
+                attempt += 1
+        # healing was unsuccessful
+        return error
