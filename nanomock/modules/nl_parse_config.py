@@ -264,6 +264,11 @@ class ConfigParser:
         #traffic control
         self.config_dict.setdefault(
             "tc_enable", str2bool(self.config_dict.get("tc_enable", False)))
+        
+        #enablel ogging to file
+        self.config_dict.setdefault(
+            "filelog_enable", str2bool(self.config_dict.get("filelog_enable", False)))
+        
 
         #privileged
         self.config_dict.setdefault(
@@ -986,6 +991,33 @@ class ConfigParser:
         if memory is not None:
             container["mem_limit"] = convert_to_bytes(memory)
 
+    def add_container_env_config(self, container, node_name):
+        """
+        Add environment variables to the specified container configuration.
+        Environment variables can be defined at the node level in the config.
+        """
+        # Get the environment variables specific to the node or an empty dict as default
+        env_vars = self.get_config_tag("env", node_name, {})
+
+        # If there are any environment variables to add
+        if env_vars:
+            # Make sure the container has an 'environment' key, or create it if not
+            if 'environment' not in container:
+                container['environment'] = {}
+
+            # Update the container's environment variables with those specified for the node
+            container['environment'].update(env_vars)
+
+    def enable_logging_to_file(self,container):
+        if self.config_dict.get("filelog_enable", False):
+            container['logging'] = {
+                'driver': 'json-file',
+                'options': {
+                    'max-size': '1g',
+                    'max-file': '5'
+                }
+            }
+
     def get_container_type(self, user_id):
         if user_id == "0":
             return "default_docker_root"
@@ -1025,6 +1057,8 @@ class ConfigParser:
         if container:
             self.add_container_blkio_config(container, node_name)
             self.add_container_cpu_memory_config(container, node_name)
+            self.add_container_env_config(container, node_name)
+            self.enable_logging_to_file(container)
 
     def compose_set_node_ports(self, node_name):
         node_config = self.get_node_config(node_name)
