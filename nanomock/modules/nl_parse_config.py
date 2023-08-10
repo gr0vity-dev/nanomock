@@ -264,6 +264,11 @@ class ConfigParser:
         #traffic control
         self.config_dict.setdefault(
             "tc_enable", str2bool(self.config_dict.get("tc_enable", False)))
+        
+        #enablel ogging to file
+        self.config_dict.setdefault(
+            "filelog_enable", str2bool(self.config_dict.get("filelog_enable", False)))
+        
 
         #privileged
         self.config_dict.setdefault(
@@ -1003,6 +1008,10 @@ class ConfigParser:
             # Update the container's environment variables with those specified for the node
             container['environment'].update(env_vars)
 
+    def enable_logging_to_file(self,container):
+        if self.config_dict["filelog_enable"] :            
+            container['logging'] = "*default-logging"
+
     def get_container_type(self, user_id):
         if user_id == "0":
             return "default_docker_root"
@@ -1043,6 +1052,7 @@ class ConfigParser:
             self.add_container_blkio_config(container, node_name)
             self.add_container_cpu_memory_config(container, node_name)
             self.add_container_env_config(container, node_name)
+            self.enable_logging_to_file(container)
 
     def compose_set_node_ports(self, node_name):
         node_config = self.get_node_config(node_name)

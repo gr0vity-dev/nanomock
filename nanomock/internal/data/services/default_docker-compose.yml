@@ -1,5 +1,12 @@
 version: '2.4'
 
+x-logging:
+  &default-logging
+  driver: local
+  options:
+    max-size: "1000m"
+    max-file: "5"
+
 services:
 
   default_docker:
