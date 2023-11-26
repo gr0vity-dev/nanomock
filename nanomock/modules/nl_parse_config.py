@@ -8,11 +8,10 @@ import json
 import copy
 
 from datetime import datetime
-from nanolib import Block
 from extradict import NestedData
 from pathlib import Path
 
-from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply
+from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply, Block
 from nanomock.modules.nl_rpc import NanoRpc
 from nanomock.internal.utils import read_from_package_if_needed, is_packaged_version, find_device_for_path, convert_to_bytes, get_mock_logger
 from nanomock.internal.feature_toggle import toggle

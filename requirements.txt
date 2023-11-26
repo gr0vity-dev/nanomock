@@ -2,7 +2,7 @@ pyyaml
 tomli_w
 tomli
 oyaml
-nanolib
+nano_lib_py
 extradict
 requests
 

@@ -1,4 +1,4 @@
-from nanolib import Block, get_account_id, get_account_key_pair, AccountIDPrefix, generate_account_private_key, get_account_public_key
+from nano_lib_py import Block, get_account_id, get_account_key_pair, AccountIDPrefix, generate_account_private_key, get_account_public_key, Block
 from decimal import Decimal, getcontext
 
 
