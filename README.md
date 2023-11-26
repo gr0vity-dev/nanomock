@@ -1,4 +1,4 @@
-# nano-local
+# nanomock
 
 A one click [nano-currency](https://nano.org) block-lattice environment on your local computer.
 This project aims to easily spin up an integration environment with multiple nano nodes.
