@@ -106,8 +106,6 @@ class ConfigParser:
             self.services_dir = "nanomock.internal.data.services"
             self.default_compose_path = f"{self.services_dir}.default_docker-compose.yml"
             self.default_nanomonitor_config = f"{self.services_dir}.nanomonitor.default_config.php"
-            #self.default_nanocap_config = f"{self.services_dir}.nanocap.nanocap.config"
-            #self.default_nanocap_compose = f"{self.services_dir}.nanocap.nanocap-compose.yml"
             self.default_nanomonitor_config = f"{self.services_dir}.nanovotevisu.default_docker-compose.yml"
         else:
             self.services_dir = Path().resolve(
@@ -125,7 +123,6 @@ class ConfigParser:
         self.nano_nodes_path = user_app_dir / "nano_nodes"
         self.nodes_dir = self.nano_nodes_path / "{node_name}"
         self.compose_out_path = self.nano_nodes_path / "docker-compose.yml"
-        self.tcp_analyzer_path = Path("tcp_analyzer")
 
     def __set_node_accounts(self):
         available_supply = 340282366920938463463374607431768211455 - int(
@@ -830,8 +827,7 @@ class ConfigParser:
         nanocap_config_path = self.nano_nodes_path / "services" / "nanocap" / "nanocap.config"
         nanocap_config = self.conf_rw.read_json(nanocap_config_path)
         nanocap_config["capture"]["device_ip"] = device_ip
-        nanocap_config = self.conf_rw.write_json(nanocap_config_path,
-                                                 nanocap_config)
+        self.conf_rw.write_json(nanocap_config_path,nanocap_config)
 
     def set_nanocap_compose(self):
 
@@ -849,19 +845,17 @@ class ConfigParser:
             f'nanocap enabled ! This may lead to a decrease in performance!')
 
     def set_tcpdump_compose(self):
-
-        tcp_analyzer_config_path = f'{self.tcp_analyzer_path}/config.json'
-        if not os.path.exists(tcp_analyzer_config_path):
-            conf_source_path = f'{self.services_dir}/tcpdump/tcp_analyzer_config.example.json'
-            copy_conf = f'cp -p {conf_source_path} {tcp_analyzer_config_path}'
-            os.system(copy_conf)
-
-        tcp_analyzer_config = self.conf_rw.read_json(tcp_analyzer_config_path,
-                                                     is_packaged=True)
-        tcp_analyzer_config["files_name_in"] = []
+        
+        # tcpdump_compose = self.conf_rw.read_yaml(
+        #     f'{self.services_dir}/tcpdump/tcpdump-compose.yml',
+        #     is_packaged=True)
+        
+        tcpdump_config_path = self.nano_nodes_path / "services" / "tcpdump" / "tcpdump.config"        
+        tcpdump_config = self.conf_rw.read_json(tcpdump_config_path)        
+        tcpdump_config["files_name_in"] = []
 
         tcpdump_compose = self.conf_rw.read_yaml(
-            f'{self.services_dir}/tcpdump/default_docker-compose.yml')
+            f'{self.services_dir}/tcpdump/tcpdump-compose.yml',is_packaged=True)
         container = tcpdump_compose["services"]["ns_tcpdump"]
 
         container_name = f'ns_tcpdump'
@@ -882,11 +876,11 @@ class ConfigParser:
 
         #manually create the mounted file, otherwise docker-compose will create a directory
         pcap_file_path = f'{self.nano_nodes_path}/{pcap_file_name}'
-        tcp_analyzer_config["files_name_in"].append(pcap_file_path)
+        tcpdump_config["files_name_in"].append(pcap_file_path)
         subprocess.call(f'touch {pcap_file_path}', shell=True)
         self.enabled_services.append(
             f'TCPDUMP enabled ! This may lead to a decrease in performance!')
-        self.conf_rw.write_json(tcp_analyzer_config_path, tcp_analyzer_config)
+        self.conf_rw.write_json(tcpdump_config_path,tcpdump_config)
 
     def get_enabled_services(self):
         return self.enabled_services
