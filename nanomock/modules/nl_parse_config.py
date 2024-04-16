@@ -6,6 +6,8 @@ import oyaml as yaml
 import secrets
 import json
 import copy
+import platform
+
 
 from datetime import datetime
 from extradict import NestedData
@@ -91,13 +93,13 @@ class ConfigParser:
         self.compose_dict = self.conf_rw.read_yaml(self.default_compose_path,
                                                    is_packaged=True)
         self.__config_dict_add_genesis_to_nodes()
-        self.__config_dict_set_node_variables()  #modifies config_dict
-        self.__config_dict_set_default_values()  #modifies config_dict
+        self.__config_dict_set_node_variables()  # modifies config_dict
+        self.__config_dict_set_default_values()  # modifies config_dict
         self.__set_preconfigured_peers()
         self.__set_node_accounts()
         self.__set_balance_from_vote_weight()
         self.__set_special_account_data()
-        #self.__set_docker_compose()
+        # self.__set_docker_compose()
 
     def _set_path_variables(self, app_dir, config_file):
         user_app_dir = Path(app_dir).resolve()
@@ -158,6 +160,12 @@ class ConfigParser:
         if "remote_address" not in self.config_dict:
             self.config_dict["remote_address"] = '127.0.0.1'
 
+        os_name = platform.system()
+        if os_name == 'Darwin' and self.config_dict["remote_address"] == "172.17.0.1":
+            self.logger.info(
+                "macOs doesn't support docker interface 172.17.0.1. Force 127.0.0.1 usage.")
+            self.config_dict["remote_address"] = '127.0.0.1'
+
         if "host_port_peer" not in self.config_dict["representatives"]:
             self.config_dict["representatives"]["host_port_peer"] = 44000
         if "host_port_peer" not in self.config_dict["representatives"]:
@@ -168,7 +176,7 @@ class ConfigParser:
         if "node_prefix" not in self.config_dict["representatives"]:
             self.config_dict["representatives"]["node_prefix"] = "ns"
 
-        host_port_inc = 0  #set incremental ports for nodes starting with 0
+        host_port_inc = 0  # set incremental ports for nodes starting with 0
         for node in self.config_dict["representatives"]["nodes"]:
 
             if "name" not in node:
@@ -178,16 +186,17 @@ class ConfigParser:
                 modified_config = True
             node["name"] = node["name"].lower()
 
-            if "seed" not in node and not self.is_genesis(node):
-                node["seed"] = secrets.token_hex(32)
-                self.logger.warning(
-                    f'no seed set for a node. New seed : {node["seed"]}')
-                modified_config = True
+            # if "seed" not in node andand not self.is_genesis(node):
+            #     node["seed"] = secrets.token_hex(32)
+            #     self.logger.warning(
+            #         f'no seed set for a node. New seed : {node["seed"]}')
+            #     modified_config = True
 
-            #Add ports for each node
+            # Add ports for each node
             node["name"] = self.get_node_prefix() + node["name"]
 
-            if self.config_dict["env"] == "gcloud": host_port_inc = 0
+            if self.config_dict["env"] == "gcloud":
+                host_port_inc = 0
 
             node["host_port_peer"] = self.config_dict["representatives"][
                 "host_port_peer"] + host_port_inc
@@ -210,7 +219,7 @@ class ConfigParser:
                 self.conf_rw.write_toml(self.services_dir, self.config_dict)
 
     def __config_dict_set_default_values(self):
-        #self.config_dict = conf_rw.read_toml(self.services_dir)
+        # self.config_dict = conf_rw.read_toml(self.services_dir)
         self.config_dict["NANO_TEST_EPOCH_1"] = "0x000000000000000f"
 
         self.config_dict.setdefault(
@@ -228,7 +237,7 @@ class ConfigParser:
             "NANO_TEST_CANARY_PUB",
             "CCAB949948224D6B33ACE0E078F7B2D3F4D79DF945E46915C5300DAEF237934E")
 
-        #nanolooker
+        # nanolooker
         self.config_dict.setdefault(
             "nanolooker_enable",
             str2bool(self.config_dict.get("nanolooker_enable", False)))
@@ -236,7 +245,7 @@ class ConfigParser:
         self.config_dict.setdefault("nanolooker_node_name", "genesis")
         self.config_dict.setdefault("nanolooker_mongo_port", 27017)
 
-        #nanomonitor, nanoticker, nano-vote-visualizer
+        # nanomonitor, nanoticker, nano-vote-visualizer
         self.config_dict.setdefault(
             "nanomonitor_enable",
             str2bool(self.config_dict.get("nanomonitor_enable", False)))
@@ -247,7 +256,7 @@ class ConfigParser:
             "nanovotevisu_enable",
             str2bool(self.config_dict.get("nanovotevisu_enable", False)))
 
-        #prom-exporter
+        # prom-exporter
         self.config_dict.setdefault(
             "promexporter_enable",
             str2bool(self.config_dict.get("promexporter_enable", False)))
@@ -257,25 +266,24 @@ class ConfigParser:
                 self.config_dict.get("prom_gateway", "nl_pushgateway:9091")))
         self.config_dict.setdefault("prom_runid", "default")
 
-        #traffic control
+        # traffic control
         self.config_dict.setdefault(
             "tc_enable", str2bool(self.config_dict.get("tc_enable", False)))
-        
-        #enablel ogging to file
+
+        # enablel ogging to file
         self.config_dict.setdefault(
             "filelog_enable", str2bool(self.config_dict.get("filelog_enable", False)))
-        
 
-        #privileged
+        # privileged
         self.config_dict.setdefault(
             "privileged", str2bool(self.config_dict.get("privileged", False)))
 
-        #nanocap
+        # nanocap
         self.config_dict.setdefault(
             "nanocap_enable",
             str2bool(self.config_dict.get("nanocap_enable", False)))
 
-        #tcpdump
+        # tcpdump
         self.config_dict.setdefault(
             "tcpdump_enable",
             str2bool(self.config_dict.get("tcpdump_enable", False)))
@@ -321,16 +329,16 @@ class ConfigParser:
             if "vote_weight" in node_conf:
                 node_conf["balance"] = raw_high_precision_multiply(
                     available_supply, node_conf["vote_weight"])
-            #evaluate if a node is a PR
-            #if a node has more than 0.1% of available supply it's considered a PR.
-            #this is accurate in the case that all nodes are online. (which is reasonable in a private network)
+            # evaluate if a node is a PR
+            # if a node has more than 0.1% of available supply it's considered a PR.
+            # this is accurate in the case that all nodes are online. (which is reasonable in a private network)
 
             if "balance" in node_conf:
                 genesis_balance = genesis_balance - int(node_conf["balance"])
                 node_conf["is_pr"] = self.__is_principal_representative(
                     available_supply, node_conf["balance"])
 
-        #add genesis_balance to config
+        # add genesis_balance to config
         self.get_genesis_config(
         )["is_pr"] = self.__is_principal_representative(
             available_supply, genesis_balance)
@@ -362,7 +370,7 @@ class ConfigParser:
         )
 
     def _remove_keys_with_value(self, d, k, val):
-        #if dict (d), search for key (k) that has value (val) and remove key-value pairfrom dict
+        # if dict (d), search for key (k) that has value (val) and remove key-value pairfrom dict
         if k in d and d[k] == val:
             d.pop(k)
         for v in d.values():
@@ -404,7 +412,7 @@ class ConfigParser:
         return self.get_node_prefix() + node_name
 
     def get_node_prefix(self):
-        #set during initialisation in __config_dict_set_node_variables
+        # set during initialisation in __config_dict_set_node_variables
         return self.config_dict["representatives"]["node_prefix"] + "_"
 
     def get_project_name(self):
@@ -536,7 +544,8 @@ class ConfigParser:
 
         for node_name in self.get_nodes_name():
             node_conf = self.get_node_config(node_name)
-            if rpc_endpoint.RPC_URL == node_conf["rpc_url"]: return node_name
+            if rpc_endpoint.get_url() == node_conf["rpc_url"]:
+                return node_name
         return None
 
     def get_remote_address(self):
@@ -594,7 +603,7 @@ class ConfigParser:
         return self.config_dict["canary_account_data"]
 
     def get_max_balance_key(self):
-        #returns the privatekey for the node with the highest defined balance.
+        # returns the privatekey for the node with the highest defined balance.
         nodes_conf = self.get_nodes_config()
         max_balance = max(
             int(x["balance"]) if "balance" in x else 0
@@ -610,17 +619,18 @@ class ConfigParser:
             response.append(node["name"])
         return response
 
-    def get_conatiners_name(self):
+    def get_containers_name(self):
         if not os.path.exists(self.compose_out_path):
             return []
 
         compose_config = self.conf_rw.read_yaml(self.compose_out_path)
+
         return [service for service in compose_config["services"].keys()]
 
     def get_nodes_config(self):
         res = []
         for node_name in self.get_nodes_name():
-            #res[node_name] = self.get_node_config(node_name)
+            # res[node_name] = self.get_node_config(node_name)
             res.append(self.get_node_config(node_name))
         return res
 
@@ -650,7 +660,14 @@ class ConfigParser:
     def set_network_name(self):
         self.compose_dict["networks"]["nano-local"][
             "name"] = self.get_node_prefix(
-            ) + self.compose_dict["networks"]["nano-local"]["name"]
+        ) + self.compose_dict["networks"]["nano-local"]["name"]
+
+    def keep_nodes_by_name(self, nodes):
+        # Filter the list to keep only nodes with names in the 'nodes' list
+        filtered_nodes = [
+            node for node in self.config_dict["representatives"]["nodes"] if node["name"] in nodes]
+        # Assign the filtered list back to the config_dict
+        self.config_dict["representatives"]["nodes"] = filtered_nodes
 
     def set_docker_compose(self):
         default_service_names = [
@@ -659,7 +676,7 @@ class ConfigParser:
 
         self.set_network_name()
 
-        #Add nodes and ports
+        # Add nodes and ports
         for node in self.config_dict["representatives"]["nodes"]:
             self.compose_add_node(node["name"])
             self.compose_set_node_ports(node["name"])
@@ -685,7 +702,7 @@ class ConfigParser:
         if bool(self.get_config_value("nanocap_enable")):
             self.set_nanocap_compose()
 
-        #remove default container
+        # remove default container
         for service in default_service_names:
             self.compose_dict["services"].pop(service, None)
 
@@ -722,10 +739,10 @@ class ConfigParser:
         for container in nanolooker_compose["services"]:
             container_name = self.get_node_prefix(
             ) + nanolooker_compose["services"][container]["container_name"]
-            #Add all containers from docker-compose file to our compose_dict
+            # Add all containers from docker-compose file to our compose_dict
             self.compose_dict["services"][container] = nanolooker_compose[
                 "services"][container]
-            #add prefix to container_name defined in docker-compose file
+            # add prefix to container_name defined in docker-compose file
 
             self.compose_dict["services"][container][
                 "container_name"] = container_name
@@ -734,7 +751,7 @@ class ConfigParser:
             self.get_name_with_prefix(
                 self.config_dict["nanolooker_node_name"]))
 
-        #in webbrowser: access websocket of the remote machine instead of localhost
+        # in webbrowser: access websocket of the remote machine instead of localhost
         self.compose_dict["services"]["nl_nanolooker"]["build"]["args"][
             0] = f'REMOTE_ADDRESS={self.get_config_value("remote_address")}'
         self.compose_dict["services"]["nl_nanolooker"]["build"]["args"][
@@ -743,10 +760,10 @@ class ConfigParser:
             2] = f'MONGO_PORT={self.config_dict["nanolooker_mongo_port"]}'
         self.compose_dict["services"]["nl_nanolooker"]["build"]["args"][
             3] = f'NODE_WEBSOCKET_PORT={nanolooker_node_config["host_port_ws"]}'
-        #set node for RPC
+        # set node for RPC
         self.compose_dict["services"]["nl_nanolooker"]["environment"][
             2] = f'RPC_DOMAIN=http://{nanolooker_node_config["name"]}:17076'
-        #set correct port
+        # set correct port
         self.compose_dict["services"]["nl_nanolooker"]["ports"][
             0] = f'{self.config_dict["nanolooker_port"]}:3010'
         self.enabled_services.append(
@@ -779,7 +796,7 @@ class ConfigParser:
         DockerInterfaceClass = get_docker_interface_class()
         host_ip = DockerInterfaceClass.get_docker_gateway_ip()
 
-        #Create prometheus, prom-gateway and grafana IF we use default prom-gateway
+        # Create prometheus, prom-gateway and grafana IF we use default prom-gateway
         if self.get_config_value("prom_gateway") == "nl_pushgateway:9091":
             promexporter_compose = self.conf_rw.read_yaml(
                 f'{self.services_dir}/promexporter/default_docker-compose.yml',
@@ -795,7 +812,7 @@ class ConfigParser:
                 f'promgateway enabled at {self.get_config_value("remote_address")}:42005'
             )
 
-        #Create 1 exporter per node
+        # Create 1 exporter per node
         for node in self.config_dict["representatives"]["nodes"]:
             node_config = self.get_node_config(node["name"])
             node_rpc_port = node_config["host_port_rpc"]
@@ -824,14 +841,15 @@ class ConfigParser:
                 f'{container_name} added for node {node["name"]}')
 
     def set_nanocap_device_ip(self, device_ip):
-        nanocap_config_path = self.nano_nodes_path / "services" / "nanocap" / "nanocap.config"
+        nanocap_config_path = self.nano_nodes_path / \
+            "services" / "nanocap" / "nanocap.config"
         nanocap_config = self.conf_rw.read_json(nanocap_config_path)
         nanocap_config["capture"]["device_ip"] = device_ip
-        self.conf_rw.write_json(nanocap_config_path,nanocap_config)
+        self.conf_rw.write_json(nanocap_config_path, nanocap_config)
 
     def set_nanocap_compose(self):
 
-        #nanocap_config = self.conf_rw.read_json(self.default_nanocap_config,is_packaged=True)
+        # nanocap_config = self.conf_rw.read_json(self.default_nanocap_config,is_packaged=True)
 
         nanocap_compose = self.conf_rw.read_yaml(
             f'{self.services_dir}/nanocap/nanocap-compose.yml',
@@ -845,42 +863,43 @@ class ConfigParser:
             f'nanocap enabled ! This may lead to a decrease in performance!')
 
     def set_tcpdump_compose(self):
-        
+
         # tcpdump_compose = self.conf_rw.read_yaml(
         #     f'{self.services_dir}/tcpdump/tcpdump-compose.yml',
         #     is_packaged=True)
-        
-        tcpdump_config_path = self.nano_nodes_path / "services" / "tcpdump" / "tcpdump.config"        
-        tcpdump_config = self.conf_rw.read_json(tcpdump_config_path)        
+
+        tcpdump_config_path = self.nano_nodes_path / \
+            "services" / "tcpdump" / "tcpdump.config"
+        tcpdump_config = self.conf_rw.read_json(tcpdump_config_path)
         tcpdump_config["files_name_in"] = []
 
         tcpdump_compose = self.conf_rw.read_yaml(
-            f'{self.services_dir}/tcpdump/tcpdump-compose.yml',is_packaged=True)
+            f'{self.services_dir}/tcpdump/tcpdump-compose.yml', is_packaged=True)
         container = tcpdump_compose["services"]["ns_tcpdump"]
 
         container_name = f'ns_tcpdump'
         pcap_file_name = f'{self.get_config_value("tcpdump_filename")}'
 
-        #container_name = 'ns_tcpdump'
+        # container_name = 'ns_tcpdump'
 
         self.compose_dict["services"][container_name] = container
         self.compose_dict["services"][container_name][
             "container_name"] = container_name
 
-        #mount pcap file
+        # mount pcap file
         self.compose_dict["services"][container_name]["volumes"][
             0] = self.compose_dict["services"][container_name]["volumes"][
                 0].replace("FILENAME", pcap_file_name)
-        #network_mode
+        # network_mode
         self.compose_dict["services"][container_name]["network_mode"] = "host"
 
-        #manually create the mounted file, otherwise docker-compose will create a directory
+        # manually create the mounted file, otherwise docker-compose will create a directory
         pcap_file_path = f'{self.nano_nodes_path}/{pcap_file_name}'
         tcpdump_config["files_name_in"].append(pcap_file_path)
         subprocess.call(f'touch {pcap_file_path}', shell=True)
         self.enabled_services.append(
             f'TCPDUMP enabled ! This may lead to a decrease in performance!')
-        self.conf_rw.write_json(tcpdump_config_path,tcpdump_config)
+        self.conf_rw.write_json(tcpdump_config_path, tcpdump_config)
 
     def get_enabled_services(self):
         return self.enabled_services
@@ -898,10 +917,10 @@ class ConfigParser:
         self.conf_rw.write_yaml(self.compose_out_path, self.compose_dict)
 
     def get_config_tag(self, tag, node_name, default):
-        #takes the first non empty tag.
-        #First looks for the individual tag
-        #then for the general tag
-        #last uses the default
+        # takes the first non empty tag.
+        # First looks for the individual tag
+        # then for the general tag
+        # last uses the default
         individual_tag = self.get_representative_config(tag, node_name)
         general_tag = self.get_representative_config(tag, None)
 
@@ -940,7 +959,8 @@ class ConfigParser:
         return disk_defaults.get(disk_type.upper(), None)
 
     def add_container_blkio_config(self, container, node_name):
-        if toggle.is_feature_disabled("config_blkio"): return
+        if toggle.is_feature_disabled("config_blkio"):
+            return
         blkio_config = {}
         config_tags = [
             "device_read_bps",
@@ -1001,7 +1021,7 @@ class ConfigParser:
             # Update the container's environment variables with those specified for the node
             container['environment'].update(env_vars)
 
-    def enable_logging_to_file(self,container):
+    def enable_logging_to_file(self, container):
         if self.config_dict.get("filelog_enable", False):
             container['logging'] = {
                 'driver': 'json-file',
@@ -1068,7 +1088,7 @@ class ConfigParser:
         ]
 
     def cp_dockerfile_and_nano_node(self, exec_path, node_name):
-        #copy nano_node into working directory for Dockerfile
+        # copy nano_node into working directory for Dockerfile
         dockerfile_path = self.nodes_dir.format(node_name=node_name)
         if exec_path.split(".")[-1] == "deb":
             copy_node = f"cp -p {exec_path} {dockerfile_path}/package.deb"
@@ -1087,7 +1107,7 @@ class ConfigParser:
         return dockerfile_path
 
     def compose_add_container(self, node_name, default_container):
-        #copies a default container and adds it as a new container
+        # copies a default container and adds it as a new container
         self.compose_dict["services"][node_name] = copy.deepcopy(
             self.compose_dict["services"][default_container])
         self.compose_dict["services"][node_name]["container_name"] = node_name
@@ -1097,37 +1117,37 @@ class ConfigParser:
         return self.compose_dict["services"][node_name]
 
     def get_config_from_path(self, node_name, config_path_key):
-        #returns None if no path is found
+        # returns None if no path is found
         config_dict_l = None
         if self.get_representative_config(
                 config_path_key,
-                node_name)["found"]:  #search by individual path
+                node_name)["found"]:  # search by individual path
             config_dict_l = self.conf_rw.read_toml(
                 self.get_representative_config(config_path_key,
                                                node_name)["value"])
         elif self.get_representative_config(
-                config_path_key, None)["found"]:  #search by shared path
+                config_path_key, None)["found"]:  # search by shared path
             config_dict_l = self.conf_rw.read_toml(
                 self.get_representative_config(config_path_key, None)["value"])
         else:
-            pass  #return None
+            pass  # return None
         return config_dict_l
 
     def get_representative_config(self, node_key, node_name):
-        #scan node config and match by name. Return the value of the key found in the config
-        #response : {"found" : Bool, "value" = ...}
+        # scan node config and match by name. Return the value of the key found in the config
+        # response : {"found" : Bool, "value" = ...}
         if node_name is None and node_key is None:
             return {"found": False}
 
         if node_name is None:
-            #shared config
+            # shared config
             if node_key in self.config_dict["representatives"]:
                 return {
                     "found": True,
                     "value": self.config_dict["representatives"][node_key]
                 }
         else:
-            #individual config
+            # individual config
             representatives_config = self.value_in_dict_array(
                 self.config_dict["representatives"]["nodes"], node_name)
             if representatives_config["found"] == True:

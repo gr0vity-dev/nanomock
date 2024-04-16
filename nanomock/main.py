@@ -22,7 +22,7 @@ def parse_args():
                             'create', 'start', 'start_nodes', 'status',
                             'restart', 'init', 'init_wallets', 'conf_edit',
                             'stop', 'stop_nodes', 'update', 'remove', 'reset',
-                            'down', 'destroy', 'rpc'
+                            'down', 'destroy', 'rpc', 'beta_create', 'beta_init'
                         ])
     parser.add_argument('--path',
                         default=_get_default_app_dir(),
@@ -30,8 +30,7 @@ def parse_args():
     parser.add_argument(
         '--nodes',
         nargs='+',
-        help=
-        'List of container names (only required for start, stop, remove, and rpc commands)'
+        help='List of container names (only required for start, stop, remove, and rpc commands)'
     )
     parser.add_argument(
         '--project_name',

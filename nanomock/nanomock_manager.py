@@ -52,7 +52,7 @@ class NanoLocalManager:
             self.compose_yml_path, self.project_name)
 
     def _initialize_command_mapping(self):
-        #(command_method , validation_method)
+        # (command_method , validation_method)
         return {
             'create': (self.create_docker_compose_file, None),
             'start': (self.start_containers, None),
@@ -62,6 +62,8 @@ class NanoLocalManager:
             'reset': (self.reset_nodes_data, None),
             'init': (self.init_nodes, None),
             'init_wallets': (self.init_wallets, None),
+            'beta_create': (self.beta_create, None),
+            'beta_init': (self.beta_init, None),
             'stop': (self.stop_containers, None),
             'stop_nodes': (self.stop_all_nodes, None),
             'remove': (self.remove_containers, None),
@@ -73,7 +75,7 @@ class NanoLocalManager:
 
     def _get_default(self, config_name):
         """ Load config with default values"""
-        #minimal node config if no file is provided in the nl_config.toml
+        # minimal node config if no file is provided in the nl_config.toml
         if config_name == "config_node":
             default_config_path = os.path.join(self.services_dir,
                                                "default_config-node.toml")
@@ -90,7 +92,7 @@ class NanoLocalManager:
         env_variables = self.conf_p.get_docker_compose_env_variables()
         self.conf_rw.write_list(f'{self.compose_env_path}', env_variables)
 
-    def _generate_docker_compose_yml_file(self):
+    def _generate_docker_compose_yml_file(self, genesis_only=False):
         self.conf_p.set_docker_compose()
         self.conf_p.write_docker_compose()
 
@@ -139,8 +141,12 @@ class NanoLocalManager:
             nano_monitor_path = os.path.join(nano_node_path, "nanoNodeMonitor")
             os.makedirs(nano_monitor_path, exist_ok=True)
 
-    def _prepare_nodes(self):
-        #prepare genesis
+    def _prepare_nodes(self, genesis_only=False):
+        # prepare genesis
+        nodes = self.conf_p.get_nodes_name()
+        if genesis_only:
+            nodes = [nodes[0]]
+            logging.info("Only genesis node will be created")
         for node_name in self.conf_p.get_nodes_name():
             self._prepare_node_env(node_name)
 
@@ -238,7 +244,7 @@ class NanoLocalManager:
         try:
             nano_rpc = NanoRpc(rpc_url)
             logging.info("call _is_rpc_available")
-            if nano_rpc.block_count(max_retry=0):
+            if nano_rpc.block_count():
                 return container, True
         except Exception as e:
             logging.warning(
@@ -311,9 +317,12 @@ class NanoLocalManager:
             nodes_name, nodes_block_count)
 
     @log_on_success
-    def create_docker_compose_file(self):
+    def create_docker_compose_file(self, genesis_only=False):
         extract_packaged_services_to_disk(self.nano_nodes_path)
-        self._prepare_nodes()
+        if genesis_only:
+            genesis_name = self.conf_p.get_nodes_name()[0]
+            self.conf_p.keep_nodes_by_name([genesis_name])
+        self._prepare_nodes(genesis_only=genesis_only)
         self._generate_docker_compose_env_file()
         self._generate_docker_compose_yml_file()
         self.docker_interface.create_network(self.conf_p.get_network_name())
@@ -361,7 +370,7 @@ class NanoLocalManager:
 
     @log_on_success
     def init_wallets(self):
-        #self.start_nodes('all')  #fixes a bug on mac m1
+        # self.start_nodes('all')  #fixes a bug on mac m1
         init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
         for node_name in self.conf_p.get_nodes_name():
@@ -377,7 +386,7 @@ class NanoLocalManager:
                     node_name,
                     seed=self.conf_p.get_node_config(node_name)["seed"])
 
-        #return without logging for unit tests
+        # return without logging for unit tests
         return init_blocks.logger.pop("InitialBlocks")
 
     @log_on_success
@@ -386,6 +395,18 @@ class NanoLocalManager:
         init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
         return init_blocks.publish_initial_blocks()
+
+    @log_on_success
+    def beta_create(self):
+        self.create_docker_compose_file(genesis_only=True)
+
+    @log_on_success
+    def beta_init(self):
+        genesis_name = self.conf_p.get_nodes_name()[0]
+        self.start_containers([genesis_name])
+        init_blocks = InitialBlocks(self.conf_p,
+                                    self.conf_p.get_nodes_rpc()[0])
+        return init_blocks.publish_initial_blocks(move_weight=False)
 
     @log_on_success
     def reset_nodes_data(self, nodes: Optional[List[str]] = None):
@@ -426,19 +447,20 @@ class NanoLocalManager:
 
     @log_on_success
     def stop_containers(self, nodes: Optional[List[str]] = None):
-        #by default, stops all containers (also services like nanolooker, monitor or prom-exporter)
+        # by default, stops all containers (also services like nanolooker, monitor or prom-exporter)
         self.docker_interface.compose_stop(nodes)
 
     @log_on_success
     def stop_all_nodes(self):
-        #stops all nodes but leaves services running
+        # stops all nodes but leaves services running
         nodes = self.conf_p.get_nodes_name()
         self.docker_interface.compose_stop(nodes)
 
     @log_on_success
     def remove_containers(self):
-        containers = self.conf_p.get_conatiners_name()
-        self.docker_interface.compose_down()
+        containers = self.conf_p.get_containers_name()
+        if containers:
+            self.docker_interface.compose_down()
         started_count = self.docker_interface.container_count(containers)
         removed_count = len(containers) - started_count
         return f"{removed_count} containers have been removed"

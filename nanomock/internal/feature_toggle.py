@@ -7,7 +7,7 @@ class FeatureToggle:
     def __init__(self):
         self.os_name = platform.system()
         self.logger = get_mock_logger()
-        #this way, if we remove the entry, the feature is enabled, even if we forget to remove the toggle code
+        # this way, if we remove the entry, the feature is enabled, even if we forget to remove the toggle code
         self.disabled_features = {
             "config_blkio": self.os_name == 'Darwin',
         }
