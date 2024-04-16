@@ -14,6 +14,7 @@ import shutil
 
 
 def get_mock_logger():
+    logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     if not logger.hasHandlers():
         handler = logging.StreamHandler()
@@ -45,7 +46,7 @@ class NanoMockLogger(logging.Logger):
 
 # Set the custom logger as the root logger
 logging.setLoggerClass(NanoMockLogger)
-logger = logging.getLogger(__name__)
+logger = get_mock_logger()
 
 
 def log_on_success(func: Callable) -> Callable:
@@ -176,10 +177,19 @@ def shutil_rmtree(path: Path):
 
 def subprocess_run_capture_output(cmd, shell=True, cwd=None):
 
-    result = subprocess.run(cmd,
-                            shell=shell,
-                            check=True,
-                            capture_output=True,
-                            text=True,
-                            cwd=cwd)
+    try:
+        result = subprocess.run(cmd,
+                                shell=shell,
+                                check=True,
+                                capture_output=True,
+                                text=True,
+                                cwd=cwd)
+    except subprocess.CalledProcessError as exc:
+        # Log the error and the command
+        logger.error("Command failed: %s", cmd)
+        logger.error("Error output: %s", exc.stderr)
+        logger.error("Return code: %s", exc.returncode)
+        raise Exception(
+            f"Command '{cmd}' failed with return code {exc.returncode}: {exc.stderr}")
+
     return result
