@@ -3,6 +3,7 @@ from nanomock.nanomock_manager import NanoLocalManager
 from nanomock.internal.utils import is_packaged_version
 from pathlib import Path
 from os import environ
+import asyncio
 import json
 
 
@@ -46,12 +47,15 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(args=None):
+async def main_async(args=None):
     args = args or parse_args()
-    manager = NanoLocalManager(args.path, args.project_name,
-                               environ.get("NL_CONF_FILE", "nl_config.toml"))
+    manager = NanoLocalManager(args.path, args.project_name, environ.get(
+        "NL_CONF_FILE", "nl_config.toml"))
+    await manager.execute_command(args.command, args.nodes, args.payload)
 
-    manager.execute_command(args.command, args.nodes, args.payload)
+
+def main(args=None):
+    asyncio.run(main_async(args))
 
 
 if __name__ == '__main__':

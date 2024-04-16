@@ -6,7 +6,7 @@ class BalanceFormat(Enum):
     NANO = 10**30
 
 
-def truncate(number):
+def _truncate(number):
     # Improved to handle edge cases and ensure consistent output format
     return '{:.8f}'.format(number if number > 0 else 0.00)
 
@@ -39,7 +39,7 @@ def format_balance_data(response, account):
     return {
         "account": account,
         "balance_raw": balance_raw,
-        "balance": truncate(balance),
-        "pending": truncate(pending),
-        "total": truncate(total)
+        "balance": _truncate(balance),
+        "pending": _truncate(pending),
+        "total": _truncate(total)
     }

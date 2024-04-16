@@ -1,32 +1,25 @@
-import os
-from pathlib import Path
-import logging
-from typing import List, Optional
-from .internal.dependency_checker import DependencyChecker
-from .modules.nl_parse_config import ConfigParser, ConfigReadWrite
-from .internal.nl_initialise import InitialBlocks
-from .docker import create_docker_interface
-from .modules.nl_rpc import NanoRpc
-from .internal.utils import log_on_success, get_mock_logger, shutil_rmtree, extract_packaged_services_to_disk, subprocess_run_capture_output
 from typing import List, Dict, Optional, Tuple, Union
-import concurrent.futures
 from math import floor
 import json
 import time
 import inspect
+import asyncio
+import os
+from pathlib import Path
+import logging
 
-logger = None
-
-
-def init_logger():
-    global logger
-    logger = logger or get_mock_logger()
+from nanomock.internal.dependency_checker import DependencyChecker
+from nanomock.modules.nl_parse_config import ConfigParser, ConfigReadWrite
+from nanomock.internal.nl_initialise import InitialBlocks
+from nanomock.docker import create_docker_interface
+from nanomock.modules.nl_rpc import NanoRpc
+from nanomock.internal.utils import log_on_success, shutil_rmtree, extract_packaged_services_to_disk, subprocess_run_capture_output
+from nanomock.internal.utils import logger
 
 
 class NanoLocalManager:
 
     def __init__(self, dir_path, project_name, config_file="nl_config.toml"):
-        init_logger()
         self.command_mapping = self._initialize_command_mapping()
         self.conf_p = ConfigParser(dir_path,
                                    config_file=config_file,
@@ -92,7 +85,7 @@ class NanoLocalManager:
         env_variables = self.conf_p.get_docker_compose_env_variables()
         self.conf_rw.write_list(f'{self.compose_env_path}', env_variables)
 
-    def _generate_docker_compose_yml_file(self, genesis_only=False):
+    def _generate_docker_compose_yml_file(self):
         self.conf_p.set_docker_compose()
         self.conf_p.write_docker_compose()
 
@@ -175,7 +168,7 @@ class NanoLocalManager:
         online_count = len(online_containers)
         return online_count
 
-    def _get_nodes_block_counts(
+    async def _get_nodes_block_counts(
             self, nodes_name: List[str]) -> List[Dict[str, Union[str, int]]]:
         nodes_block_count = []
 
@@ -183,19 +176,23 @@ class NanoLocalManager:
             NanoRpc(self.conf_p.get_node_rpc(node)) for node in nodes_name
         ] if nodes_name is not None else self._get_all_rpc())
 
-        for nano_rpc in nodes_rpc:
-            block_count = nano_rpc.block_count()
-            version_rpc_call = nano_rpc.version()
-            if not (block_count or version_rpc_call):
-                continue
-            node_name = self.conf_p.get_node_name_from_rpc_url(nano_rpc)
-            count = int(block_count["count"])
-            nodes_block_count.append({
-                "node_name": node_name,
-                "count": count,
-                "cemented": block_count["cemented"],
-                "version": version_rpc_call
-            })
+        for node_rpc in nodes_rpc:
+            try:
+                block_count = await node_rpc.block_count()
+                version_rpc_call = await node_rpc.version()
+                if not (block_count or version_rpc_call):
+                    continue
+                node_name = self.conf_p.get_node_name_from_rpc(
+                    node_rpc)
+                count = int(block_count["count"])
+                nodes_block_count.append({
+                    "node_name": node_name,
+                    "count": count,
+                    "cemented": block_count["cemented"],
+                    "version": version_rpc_call
+                })
+            except:
+                pass
 
         return nodes_block_count
 
@@ -237,14 +234,15 @@ class NanoLocalManager:
     def _get_all_rpc(self):
         return [NanoRpc(x) for x in self.conf_p.get_nodes_rpc()]
 
-    def _is_rpc_available(self,
-                          container: str,
-                          timeout: int = 3) -> Tuple[str, bool]:
+    async def _is_rpc_available(self,
+                                container: str,
+                                timeout: int = 3) -> Tuple[str, bool]:
         rpc_url = self.conf_p.get_node_rpc(container)
         try:
             nano_rpc = NanoRpc(rpc_url)
             logging.info("call _is_rpc_available")
-            if nano_rpc.block_count():
+            block_count = await nano_rpc.block_count()
+            if block_count:
                 return container, True
         except Exception as e:
             logging.warning(
@@ -253,30 +251,25 @@ class NanoLocalManager:
 
         return container, False
 
-    def _wait_for_rpc_availability(self,
-                                   nodes_name: List[str] = None,
-                                   wait: bool = True,
-                                   timeout: int = 10,
-                                   max_timeout_s: int = 15) -> None:
+    async def _wait_for_rpc_availability(self,
+                                         nodes_name: List[str] = None,
+                                         wait: bool = True,
+                                         timeout: int = 10,
+                                         max_timeout_s: int = 15) -> None:
         start_time = time.time()
 
         nodes_name = nodes_name or self.conf_p.get_nodes_name()
-        nodes_to_check = nodes_name.copy()
 
-        def get_unavailable_nodes(nodes: List[str], timeout: int) -> List[str]:
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                results = list(
-                    executor.map(self._is_rpc_available, nodes,
-                                 [timeout] * len(nodes)))
-            return [
-                container for container, available in results if not available
-            ]
+        async def get_unavailable_nodes(nodes: List[str], timeout: int) -> List[str]:
+            results = await asyncio.gather(*(self._is_rpc_available(node, timeout) for node in nodes))
+            return [node for node, available in zip(nodes, results) if not available]
+
+        nodes_to_check = nodes_name.copy()
 
         while len(nodes_to_check) > 0:
             if not wait:
                 break
-
-            nodes_to_check = get_unavailable_nodes(nodes_to_check, timeout)
+            nodes_to_check = await get_unavailable_nodes(nodes_to_check, timeout)
 
             if time.time() - start_time > max_timeout_s:
                 raise ValueError(
@@ -296,12 +289,12 @@ class NanoLocalManager:
         else:
             return f"{online_count}/{total_nodes} containers online"
 
-    def conf_edit(self, payload):
+    async def conf_edit(self, payload):
         self.conf_p.modify_nanolocal_config(payload["path"], payload["value"])
         return True
 
     @log_on_success
-    def network_status(self, nodes_name: Optional[List[str]] = None) -> str:
+    async def network_status(self, nodes_name: Optional[List[str]] = None) -> str:
         if nodes_name == []:
             return ""
 
@@ -312,12 +305,12 @@ class NanoLocalManager:
         # if "All" not in status_msg:
         #     return status_msg
 
-        nodes_block_count = self._get_nodes_block_counts(online_containers)
+        nodes_block_count = await self._get_nodes_block_counts(online_containers)
         return status_msg + self._generate_network_status_report(
             nodes_name, nodes_block_count)
 
     @log_on_success
-    def create_docker_compose_file(self, genesis_only=False):
+    async def create_docker_compose_file(self, genesis_only=False):
         extract_packaged_services_to_disk(self.nano_nodes_path)
         if genesis_only:
             genesis_name = self.conf_p.get_nodes_name()[0]
@@ -356,32 +349,33 @@ class NanoLocalManager:
         return nodes, payload
 
     @log_on_success
-    def run_rpc(self, payload=None, nodes=None):
-        responses = []
+    async def run_rpc(self, payload=None, nodes=None):
         if nodes is None:
             nodes = self.conf_p.get_nodes_name()
 
+        tasks = []
         for node in nodes:
             node_rpc = NanoRpc(self.conf_p.get_node_rpc(node))
-            response = node_rpc.post_with_auth(payload)
-            responses.append(response)
+            task = node_rpc.nanorpc.rpc.process_payloads([payload])
+            tasks.append(task)
 
+        responses = await asyncio.gather(*tasks)
         return None, json.dumps(responses, indent=2)
 
     @log_on_success
-    def init_wallets(self):
+    async def init_wallets(self):
         # self.start_nodes('all')  #fixes a bug on mac m1
         init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
         for node_name in self.conf_p.get_nodes_name():
             if node_name == self.conf_p.get_genesis_node_name():
-                init_blocks.create_node_wallet(
+                await init_blocks.create_node_wallet(
                     self.conf_p.get_node_config(
                         self.conf_p.get_genesis_node_name())["rpc_url"],
                     self.conf_p.get_genesis_node_name(),
                     private_key=self.conf_p.config_dict["genesis_key"])
             else:
-                init_blocks.create_node_wallet(
+                await init_blocks.create_node_wallet(
                     self.conf_p.get_node_config(node_name)["rpc_url"],
                     node_name,
                     seed=self.conf_p.get_node_config(node_name)["seed"])
@@ -390,18 +384,18 @@ class NanoLocalManager:
         return init_blocks.logger.pop("InitialBlocks")
 
     @log_on_success
-    def init_nodes(self):
-        self.init_wallets()
+    async def init_nodes(self):
+        await self.init_wallets()
         init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
-        return init_blocks.publish_initial_blocks()
+        return await init_blocks.publish_initial_blocks()
 
     @log_on_success
-    def beta_create(self):
+    async def beta_create(self):
         self.create_docker_compose_file(genesis_only=True)
 
     @log_on_success
-    def beta_init(self):
+    async def beta_init(self):
         genesis_name = self.conf_p.get_nodes_name()[0]
         self.start_containers([genesis_name])
         init_blocks = InitialBlocks(self.conf_p,
@@ -409,8 +403,8 @@ class NanoLocalManager:
         return init_blocks.publish_initial_blocks(move_weight=False)
 
     @log_on_success
-    def reset_nodes_data(self, nodes: Optional[List[str]] = None):
-        self.stop_containers(nodes)
+    async def reset_nodes_data(self, nodes: Optional[List[str]] = None):
+        await self.stop_containers(nodes)
         nodes_to_process = nodes or ['.']
 
         for node in nodes_to_process:
@@ -422,12 +416,12 @@ class NanoLocalManager:
                 for file_path in node_path.rglob(file_pattern):
                     file_path.unlink()
 
-    def init_containers(self):
-        self.create_docker_compose_file()
+    async def init_containers(self):
+        await self.create_docker_compose_file()
         self.build_containers()
 
     @log_on_success
-    def restart_containers(self, nodes: Optional[List[str]] = None):
+    async def restart_containers(self, nodes: Optional[List[str]] = None):
         return None, self.docker_interface.compose_restart(nodes)
 
     @log_on_success
@@ -435,29 +429,29 @@ class NanoLocalManager:
         return None, self.docker_interface.compose_build()
 
     @log_on_success
-    def start_containers(self, nodes: Optional[List[str]] = None):
+    async def start_containers(self, nodes: Optional[List[str]] = None):
         self.docker_interface.compose_start(nodes)
-        self._wait_for_rpc_availability(nodes)
+        await self._wait_for_rpc_availability(nodes)
 
     @log_on_success
-    def start_all_nodes(self):
+    async def start_all_nodes(self):
         nodes = self.conf_p.get_nodes_name()
         self.docker_interface.compose_start(nodes)
-        self._wait_for_rpc_availability(nodes)
+        await self._wait_for_rpc_availability(nodes)
 
     @log_on_success
-    def stop_containers(self, nodes: Optional[List[str]] = None):
+    async def stop_containers(self, nodes: Optional[List[str]] = None):
         # by default, stops all containers (also services like nanolooker, monitor or prom-exporter)
         self.docker_interface.compose_stop(nodes)
 
     @log_on_success
-    def stop_all_nodes(self):
+    async def stop_all_nodes(self):
         # stops all nodes but leaves services running
         nodes = self.conf_p.get_nodes_name()
         self.docker_interface.compose_stop(nodes)
 
     @log_on_success
-    def remove_containers(self):
+    async def remove_containers(self):
         containers = self.conf_p.get_containers_name()
         if containers:
             self.docker_interface.compose_down()
@@ -466,20 +460,20 @@ class NanoLocalManager:
         return f"{removed_count} containers have been removed"
 
     @log_on_success
-    def destroy(self, remove_files=False):
+    async def destroy(self, remove_files=False):
         # Stop and remove containers
-        self.remove_containers()
+        await self.remove_containers()
 
         # Remove the created files and folders if remove_files is True
         if remove_files:
             return None, shutil_rmtree(self.nano_nodes_path)
 
     @log_on_success
-    def update(self):
+    async def update(self):
         self.docker_interface.compose_pull()
         # Remove containers and networks
-        self.remove_containers()
-        self.build_containers()
+        await self.remove_containers()
+        await self.build_containers()
 
     def _filter_args(self, func, **kwargs):
         sig = inspect.signature(func)
@@ -489,7 +483,7 @@ class NanoLocalManager:
         }
         return filtered_args
 
-    def execute_command(self, command, nodes=None, payload=None):
+    async def execute_command(self, command, nodes=None, payload=None):
         if command not in self.command_mapping:
             raise ValueError(f"Invalid command: {command}")
 
@@ -507,7 +501,7 @@ class NanoLocalManager:
         filtered_command_args = self._filter_args(command_func,
                                                   nodes=validated_nodes,
                                                   payload=validated_payload)
-        command_func(**filtered_command_args)
+        await command_func(**filtered_command_args)
 
 
 if __name__ == "__main__":

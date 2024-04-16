@@ -1,26 +1,27 @@
+from importlib.metadata import version, PackageNotFoundError
+from importlib import resources
+
 import subprocess
 import functools
 import logging
-from typing import Callable, List, Any, Tuple
-from importlib.metadata import version, PackageNotFoundError
-from importlib import resources
-from pathlib import Path
+import shutil
+import json
+import asyncio
 from typing import Tuple
+from pathlib import Path
 import tomli
 import oyaml as yaml
-import json
 import bitmath
-import shutil
 
 
 def get_mock_logger():
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    if not logger.hasHandlers():
+    logger_l = logging.getLogger(__name__)
+    logger_l.setLevel(logging.INFO)
+    if not logger_l.hasHandlers():
         handler = logging.StreamHandler()
         handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-        logger.addHandler(handler)
-    return logger
+        logger_l.addHandler(handler)
+    return logger_l
 
 
 class NanoMockLogger(logging.Logger):
@@ -49,24 +50,40 @@ logging.setLoggerClass(NanoMockLogger)
 logger = get_mock_logger()
 
 
-def log_on_success(func: Callable) -> Callable:
-
+def log_on_success(func):
     @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        result = func(*args, **kwargs)
-
+    async def async_wrapper(*args, **kwargs):
+        # Await the result of the async function
+        result = await func(*args, **kwargs)
         if isinstance(result, tuple) and len(result) == 2:
             value, log_message = result
             logger.success(log_message)
             return value
         elif result is None:
-            logger.success(func.__name__)
+            logger.success(f"{func.__name__} completed with None result.")
             return None
         else:
             logger.success(result)
             return result
 
-    return wrapper
+    @functools.wraps(func)
+    def sync_wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)  # Execute the sync function normally
+        if isinstance(result, tuple) and len(result) == 2:
+            value, log_message = result
+            logger.success(log_message)
+            return value
+        elif result is None:
+            logger.success(f"{func.__name__} completed with None result.")
+            return None
+        else:
+            logger.success(result)
+            return result
+
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
 
 
 def is_packaged_version():
@@ -84,13 +101,13 @@ def _convert_to_dotted_str(path: str) -> str:
     return path.replace("/", ".")
 
 
-def _convert_to_dotted_path(path: Path, base_dir: str,
-                            replacement: str) -> Tuple[str, str]:
-    parts = path.parts
-    new_parts = [replacement if p == base_dir else p for p in parts[:-1]]
-    dot_separated_file_path = '.'.join(new_parts)
-    file_name = parts[-1]
-    return dot_separated_file_path, file_name
+# def _convert_to_dotted_path(path: Path, base_dir: str,
+#                             replacement: str) -> Tuple[str, str]:
+#     parts = path.parts
+#     new_parts = [replacement if p == base_dir else p for p in parts[:-1]]
+#     dot_separated_file_path = '.'.join(new_parts)
+#     file_name = parts[-1]
+#     return dot_separated_file_path, file_name
 
 
 def _split_file_from_path(path: str) -> Tuple[str, str]:
@@ -189,7 +206,7 @@ def subprocess_run_capture_output(cmd, shell=True, cwd=None):
         logger.error("Command failed: %s", cmd)
         logger.error("Error output: %s", exc.stderr)
         logger.error("Return code: %s", exc.returncode)
-        raise Exception(
-            f"Command '{cmd}' failed with return code {exc.returncode}: {exc.stderr}")
+        raise subprocess.CalledProcessError(
+            "Command '%s' failed with return code %s: %s", cmd, exc.returncode, exc.stderr)
 
     return result

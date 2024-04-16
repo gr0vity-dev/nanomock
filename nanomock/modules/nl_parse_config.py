@@ -1,17 +1,16 @@
 import os
 import subprocess
-import tomli
-import tomli_w
-import oyaml as yaml
 import secrets
 import json
 import copy
 import platform
-
-
 from datetime import datetime
-from extradict import NestedData
 from pathlib import Path
+
+import tomli
+import tomli_w
+import oyaml as yaml
+from extradict import NestedData
 
 from nanomock.modules.nl_nanolib import NanoLibTools, raw_high_precision_multiply, Block
 from nanomock.modules.nl_rpc import NanoRpc
@@ -28,12 +27,12 @@ class ConfigReadWrite:
 
     @read_from_package_if_needed
     def read_json(self, path, is_packaged=False):
-        with open(path, "r") as f:
+        with open(path, "r", encoding='utf-8') as f:
             return json.load(f)
 
     @read_from_package_if_needed
     def read_file(self, path, is_packaged=False):
-        with open(path, "r") as f:
+        with open(path, "r", encoding='utf-8') as f:
             return f.readlines()
 
     @read_from_package_if_needed
@@ -47,24 +46,24 @@ class ConfigReadWrite:
 
     @read_from_package_if_needed
     def read_yaml(self, path, is_packaged=False):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
 
     def write_json(self, path, json_dict):
-        with open(path, "w") as f:
+        with open(path, "w", encoding='utf-8') as f:
             json.dump(json_dict, f, indent=2)
 
     def append_json(self, path, json_dict):
-        with open(path, "a") as f:
+        with open(path, "a", encoding='utf-8') as f:
             json.dump(json_dict, f)
             f.write('\n')
 
-    def write_list(self, path, list):
-        with open(path, "w") as f:
-            print(*list, sep="\n", file=f)
+    def write_list(self, path, list_a):
+        with open(path, "w", encoding='utf-8') as f:
+            print(*list_a, sep="\n", file=f)
 
     def append_line(self, path, line):
-        with open(path, 'a') as file:
+        with open(path, 'a', encoding='utf-8') as file:
             file.write(line)
 
     def write_toml(self, path, content):
@@ -72,7 +71,7 @@ class ConfigReadWrite:
             tomli_w.dump(content, f)
 
     def write_yaml(self, path, content):
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             yaml.dump(json.loads(str(content).replace("'", '"')),
                       f,
                       default_flow_style=False)
@@ -84,7 +83,7 @@ class ConfigParser:
 
     def __init__(self, app_dir, config_file, logger=None):
         self.logger = logger or get_mock_logger()
-
+        self.runid = None
         self.enabled_services = []
         self._set_path_variables(app_dir, config_file)
         self.conf_rw = ConfigReadWrite()
@@ -182,7 +181,7 @@ class ConfigParser:
             if "name" not in node:
                 node["name"] = f"{secrets.token_hex(6)}".lower()
                 self.logger.warning(
-                    f'no name set for a node. New name : {node["name"]}')
+                    'no name set for a node. New name : %s', node["name"])
                 modified_config = True
             node["name"] = node["name"].lower()
 
@@ -343,15 +342,15 @@ class ConfigParser:
         )["is_pr"] = self.__is_principal_representative(
             available_supply, genesis_balance)
 
-    def value_in_dict(self, dict, value_l):
-        for key, value in dict.items():
+    def value_in_dict(self, dict_a, value_l):
+        for _, value in dict_a.items():
             if value == value_l:
-                return {"found": True, "value": dict}
+                return {"found": True, "value": dict_a}
         return {"found": False, "value": None}
 
-    def value_in_dict_array(self, dict_array, value_l):
-        for dict in dict_array:
-            dict_found = self.value_in_dict(dict, value_l)
+    def value_in_dict_array(self, dict_array, value_a):
+        for dict_l in dict_array:
+            dict_found = self.value_in_dict(dict_l, value_a)
             if dict_found["found"]:
                 return dict_found
         return {"found": False, "value": None}
@@ -391,14 +390,14 @@ class ConfigParser:
             config_nested.merge("DELETE_ME", nested_path)
         else:
             config_nested.merge(nested_value, nested_path)
-
-        self._remove_keys_with_value(config_nested.data,
+        nested_data = config_nested.data  # pylint: disable=no-member
+        self._remove_keys_with_value(nested_data,
                                      nested_path.split(".")[-1:][0],
                                      "DELETE_ME")
 
         if save:
-            self.config_dict = config_nested.data
-            self.conf_rw.write_toml(self.nl_config_path, config_nested.data)
+            self.config_dict = nested_data
+            self.conf_rw.write_toml(self.nl_config_path, nested_data)
 
         return config_nested
 
@@ -540,7 +539,7 @@ class ConfigParser:
             api[node_name] = node_conf["rpc_url"].split(":")[2]
         return api
 
-    def get_node_name_from_rpc_url(self, rpc_endpoint: NanoRpc):
+    def get_node_name_from_rpc(self, rpc_endpoint: NanoRpc):
 
         for node_name in self.get_nodes_name():
             node_conf = self.get_node_config(node_name)
@@ -604,7 +603,6 @@ class ConfigParser:
 
     def get_max_balance_key(self):
         # returns the privatekey for the node with the highest defined balance.
-        nodes_conf = self.get_nodes_config()
         max_balance = max(
             int(x["balance"]) if "balance" in x else 0
             for x in self.get_nodes_config())
@@ -829,7 +827,6 @@ class ConfigParser:
                 container)
             self.compose_dict["services"][container_name][
                 "container_name"] = container_name
-            self.compose_dict["services"][container_name]["command"]
 
             self.compose_dict["services"][container_name][
                 "command"] = f'--rpchost {host_ip} --rpc_port {node_rpc_port} --push_gateway {prom_gateway} --hostname {node["name"]} --runid {prom_runid} --interval 2'
@@ -860,7 +857,7 @@ class ConfigParser:
         self.compose_dict["services"][container_name][
             "container_name"] = container_name
         self.enabled_services.append(
-            f'nanocap enabled ! This may lead to a decrease in performance!')
+            'nanocap enabled ! This may lead to a decrease in performance!')
 
     def set_tcpdump_compose(self):
 
@@ -877,7 +874,7 @@ class ConfigParser:
             f'{self.services_dir}/tcpdump/tcpdump-compose.yml', is_packaged=True)
         container = tcpdump_compose["services"]["ns_tcpdump"]
 
-        container_name = f'ns_tcpdump'
+        container_name = 'ns_tcpdump'
         pcap_file_name = f'{self.get_config_value("tcpdump_filename")}'
 
         # container_name = 'ns_tcpdump'
@@ -898,7 +895,7 @@ class ConfigParser:
         tcpdump_config["files_name_in"].append(pcap_file_path)
         subprocess.call(f'touch {pcap_file_path}', shell=True)
         self.enabled_services.append(
-            f'TCPDUMP enabled ! This may lead to a decrease in performance!')
+            'TCPDUMP enabled ! This may lead to a decrease in performance!')
         self.conf_rw.write_json(tcpdump_config_path, tcpdump_config)
 
     def get_enabled_services(self):
@@ -932,7 +929,7 @@ class ConfigParser:
             return default
 
     def get_docker_tag(self, node_name):
-        self.get_config_tag(self, "docker_tag", node_name,
+        self.get_config_tag("docker_tag", node_name,
                             "nanocurrency/nano-beta:latest")
 
     def get_disk_defaults(self, disk_type):
@@ -1150,7 +1147,7 @@ class ConfigParser:
             # individual config
             representatives_config = self.value_in_dict_array(
                 self.config_dict["representatives"]["nodes"], node_name)
-            if representatives_config["found"] == True:
+            if representatives_config["found"]:
                 if node_key in representatives_config["value"]:
                     return {
                         "found": True,
