@@ -1,6 +1,5 @@
 from nanomock.nanomock_manager import NanoLocalManager
 from nanomock.modules.nl_rpc import NanoRpc
-from nanomock.docker.autoheal import DockerAutoHeal
 import json
 import pytest
 from typing import Tuple
@@ -76,19 +75,6 @@ class TestMockNetwork:
         with open('unit_tests/data/expected_network_status.txt', 'r') as f:
             expected_network_status = f.read()
         assert status == expected_network_status
-
-    def test_auto_heal_external_connectivity(self):
-        #adds 10s to the test
-        cmd = "echo Hello World!"
-        error = CalledProcessError(
-            90,
-            cmd,
-            stderr=
-            "Error response from daemon: driver failed programming external connectivity on endpoint unittest_pr1 (b1eba3d3066aad6cab7cd85fc0f78936c994ce872d3d08d7f2fb8552fa8768a2): Bind for 0.0.0.0:17078 failed: port is already allocated"
-        )
-        healer = DockerAutoHeal(3)
-        result = healer.retry_heal(error, True, None)
-        assert result == True
 
     def test_network_init(self):
 

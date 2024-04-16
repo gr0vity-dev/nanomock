@@ -1,0 +1,17 @@
+{
+    "manual_genesis": {
+        "blkio_config": null,
+        "cpus": 0.5,
+        "mem_limit": 1000000000
+    },
+    "manual_pr1": {
+        "blkio_config": null,
+        "cpus": 2.0,
+        "mem_limit": 1000000000
+    },
+    "manual_pr2": {
+        "blkio_config": null,
+        "cpus": 0.5,
+        "mem_limit": 1000000000
+    }
+}

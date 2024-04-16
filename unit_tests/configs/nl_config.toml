@@ -19,7 +19,7 @@ host_port_rpc = 45900
 host_port_ws = 47900
 #config_node_path = "./nanolocal/services/default_config-node-voting_disabled.toml"
 #config_rpc_path = "./nanolocal/services/default_config-rpc.toml"
-docker_tag = "nanocurrency/nano:V24.0"
+docker_tag = "nanocurrency/nano:V26.1"
 
 [[representatives.nodes]]
 name = "pr1"

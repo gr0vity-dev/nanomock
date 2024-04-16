@@ -3,7 +3,7 @@
     "12C91837C846F875F56F67CD83040A832CFC0F131AF3DFF9E502C0D43F5D2D15",
     "canary_key":
     "FB4E458CB13508353C5B2574B82F1D1D61367F61E88707F773F068FF90050BEE",
-    "epoch_count": 2,
+    "epoch_count": 2,    
     "burn_amount": "140282366920938463463374607431768211454",
     "NANO_TEST_EPOCH_1": "0x000000000000000f",
     "NANO_TEST_EPOCH_2": "0x000000000000000f",
@@ -24,7 +24,7 @@
         "host_port_ws":
         47900,        
         "docker_tag":
-        "nanocurrency/nano:V24.0",
+        "nanocurrency/nano:V26.1",
         "nodes": [{
             "name": "unittest_genesis",
             "key":
@@ -113,6 +113,7 @@
     "tc_enable": false,
     "tcpdump_enable": false,
     "privileged": false,
+    "filelog_enable": false,
     "nanocap_enable": false,
     "burn_account_data": {
         "account":

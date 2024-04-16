@@ -17,7 +17,7 @@ node_prefix = "unittest"
 host_port_peer = 44900
 host_port_rpc = 45900
 host_port_ws = 47900
-docker_tag = "nanocurrency/nano:V24.0"
+docker_tag = "nanocurrency/nano:V26.1"
 
 [[representatives.nodes]]
 name = "pr1"
