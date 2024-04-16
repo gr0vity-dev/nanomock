@@ -9,7 +9,7 @@ class InitialBlocks:
     def __init__(self, config_parser: ConfigParser, rpc_url, logger=None):
         logger = logger or get_mock_logger()
         self.logger = logger
-        self.api = NanoRpc(rpc_url)
+        self.nanorpc = NanoRpc(rpc_url)
         self.conf_p = config_parser
 
     def __epoch_link(self, epoch: int):
@@ -23,7 +23,7 @@ class InitialBlocks:
         self.__log_active_difficulty()
         while e <= self.conf_p.get_all()["epoch_count"]:
             link = self.__epoch_link(e)
-            epoch_block = self.api.create_epoch_block(
+            epoch_block = self.nanorpc.create_epoch_block(
                 link,
                 self.conf_p.get_genesis_account_data()["private"],
                 self.conf_p.get_genesis_account_data()["account"],
@@ -37,14 +37,14 @@ class InitialBlocks:
         pass
 
     def __log_active_difficulty(self):
-        diff = self.api.get_active_difficulty()
+        diff = self.nanorpc.active_difficulty()
         self.logger.append_log(
             "InitialBlocks", "INFO",
             f'current_diff : [{diff["network_current"]}]  current_receive_diff: [{diff["network_receive_current"]}]'
         )
 
     def __publish_canary(self):
-        fv_canary_send_block = self.api.create_send_block_pkey(
+        fv_canary_send_block = self.nanorpc.create_send_block_pkey(
             self.conf_p.get_genesis_account_data()["private"],
             self.conf_p.get_canary_account_data()["account"], 1)
         self.logger.append_log(
@@ -54,7 +54,7 @@ class InitialBlocks:
                 self.conf_p.get_canary_account_data()["account"],
                 fv_canary_send_block["hash"]))
 
-        fv_canary_open_block = self.api.create_open_block(
+        fv_canary_open_block = self.nanorpc.create_open_block(
             self.conf_p.get_canary_account_data()["account"],
             self.conf_p.get_canary_account_data()["private"], 1,
             self.conf_p.get_genesis_account_data()["account"],
@@ -71,15 +71,15 @@ class InitialBlocks:
             return False
 
         genesis_balance = int(
-            self.api.check_balance(self.conf_p.get_genesis_account_data()
-                                   ["account"])["balance_raw"])
+            self.nanorpc.check_balance(self.conf_p.get_genesis_account_data()
+                                       ["account"])["balance_raw"])
         if int(self.conf_p.get_all()["burn_amount"]) > genesis_balance:
             self.logger.append_log(
                 "InitialBlocks", "WARNING",
                 "[burn_amount] exceeds genesis balance. exit send_to_burn()")
             return False
 
-        send_block = self.api.create_send_block_pkey(
+        send_block = self.nanorpc.create_send_block_pkey(
             self.conf_p.get_genesis_account_data()["private"],
             self.conf_p.get_burn_account_data()["account"],
             self.conf_p.get_all()["burn_amount"])
@@ -94,7 +94,7 @@ class InitialBlocks:
 
     def __convert_weight_percentage_to_balance(self):
         genesis_balance = int(
-            self.api.check_balance(
+            self.nanorpc.check_balance(
                 self.conf_p.get_genesis_account_data()["account"],
                 include_only_confirmed=False)["balance_raw"])
         genesis_remaing = genesis_balance
@@ -102,7 +102,7 @@ class InitialBlocks:
         for node_conf in self.conf_p.get_nodes_config():
 
             if "vote_weight_percent" not in node_conf and "balance" not in node_conf:
-                continue  #skip genesis that was added as node
+                continue  # skip genesis that was added as node
             if "vote_weight_percent" in node_conf:
                 node_conf["balance"] = raw_high_precision_percent(
                     genesis_balance, node_conf["vote_weight_percent"])
@@ -113,7 +113,7 @@ class InitialBlocks:
                     "InitialBlocks", "WARNING",
                     f'No Genesis funds remaining! Account [{node_conf["account_data"]["account"]}] will not be opened!'
                 )
-                #self.conf_p["node_account_data"].remove(node_account_data)
+                # self.conf_p["node_account_data"].remove(node_account_data)
                 continue
             if genesis_remaing < node_conf["balance"]:
                 self.logger.append_log(
@@ -125,16 +125,16 @@ class InitialBlocks:
                 node_conf["name"], min(node_conf["balance"], genesis_remaing))
             genesis_remaing = max(0, genesis_remaing - node_conf["balance"])
 
-    def __send_vote_weigh(self):
+    def __send_vote_weight(self):
 
         for node_conf in self.conf_p.get_nodes_config():
 
             if "balance" not in node_conf:
 
-                continue  #skip genesis that was added as node
+                continue  # skip genesis that was added as node
             node_account_data = node_conf["account_data"]
 
-            send_block = self.api.create_send_block_pkey(
+            send_block = self.nanorpc.create_send_block_pkey(
                 self.conf_p.get_genesis_account_data()["private"],
                 node_account_data["account"], node_conf["balance"])
 
@@ -145,9 +145,40 @@ class InitialBlocks:
                     self.conf_p.get_genesis_account_data()["account"],
                     node_account_data["account"], send_block["hash"]))
 
-            open_block = self.api.create_open_block(
+            open_block = self.nanorpc.create_open_block(
                 node_account_data["account"], node_account_data["private"],
                 node_conf["balance"], node_account_data["account"],
+                send_block["hash"])
+
+            self.logger.append_log(
+                "InitialBlocks", "INFO",
+                "OPENED PR ACCOUNT {} : HASH {}".format(
+                    node_account_data["account"], open_block["hash"]))
+
+    def __open_accounts(self):
+
+        for node_conf in self.conf_p.get_nodes_config():
+
+            if "balance" not in node_conf:
+
+                continue  # skip genesis that was added as node
+            node_account_data = node_conf["account_data"]
+
+            send_block = self.nanorpc.create_send_block_pkey(
+                self.conf_p.get_genesis_account_data()["private"],
+                node_account_data["account"], node_conf["balance"])
+
+            self.logger.append_log(
+                "InitialBlocks", "INFO",
+                "SENT {:>40} FROM {} To {} : HASH {}".format(
+                    send_block["amount_raw"],
+                    self.conf_p.get_genesis_account_data()["account"],
+                    node_account_data["account"], send_block["hash"]))
+
+            open_block = self.nanorpc.create_open_block(
+                node_account_data["account"], node_account_data["private"],
+                node_conf["balance"], self.conf_p.get_genesis_account_data()[
+                    "account"],
                 send_block["hash"])
 
             self.logger.append_log(
@@ -160,22 +191,25 @@ class InitialBlocks:
                            node_name,
                            private_key=None,
                            seed=None):
-        api = NanoRpc(rpc_url)
+        node_rpc = NanoRpc(rpc_url)
 
         if private_key != None:
-            wallet = api.wallet_create(None)["wallet"]
-            account = api.wallet_add(wallet, private_key)["account"]
+            wallet = node_rpc.wallet_create()["wallet"]
+            account = node_rpc.wallet_add(wallet, private_key)["account"]
         if seed != None:
-            wallet = api.wallet_create(seed)["wallet"]
-            account = api.get_account_data(seed, 0)["account"]
+            wallet = node_rpc.wallet_create(seed=seed)["wallet"]
+            account = node_rpc.generate_account(seed, 0)["account"]
         self.logger.append_log(
             "InitialBlocks", "INFO",
             f"WALLET {wallet} CREATED FOR {node_name} WITH ACCOUNT {account}")
 
-    def publish_initial_blocks(self):
+    def publish_initial_blocks(self, move_weight=True):
         self.__publish_epochs()
         self.__publish_canary()
         self.__send_to_burn()
         self.__convert_weight_percentage_to_balance()
-        self.__send_vote_weigh()
+        if move_weight:
+            self.__send_vote_weight()
+        else:
+            self.__open_accounts()
         return self.logger.pop("InitialBlocks")

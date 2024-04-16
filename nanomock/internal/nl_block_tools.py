@@ -82,18 +82,19 @@ class BlockGenerator():
         if self.log_to_console:
             print("accounts opened:  {:>6}".format(
                 self.single_account_open_counter),
-                  end='\r')
+                end='\r')
         return res
 
     def set_single_change_rep(self, rep=None, nano_rpc: NanoRpc = None):
-        #returns random rep if rep is not specified
-        if rep is not None: self.single_change_rep = rep
+        # returns random rep if rep is not specified
+        if rep is not None:
+            self.single_change_rep = rep
         elif rep is None and nano_rpc is not None:
-            self.single_change_rep = nano_rpc.get_account_data(
+            self.single_change_rep = nano_rpc.generate_account(
                 nano_rpc.generate_seed(), 0)["account"]
         else:
             nano_rpc = self.get_nano_rpc_default()
-            self.single_change_rep = nano_rpc.get_account_data(
+            self.single_change_rep = nano_rpc.generate_account(
                 nano_rpc.generate_seed(), 0)["account"]
         return self.single_change_rep
 
@@ -104,9 +105,10 @@ class BlockGenerator():
                                rep=None,
                                nano_rpc=None):
         nano_rpc = self.get_nano_rpc_default()
-        if rep is None: rep = self.single_change_rep
         if rep is None:
-            rep = nano_rpc.get_account_data(nano_rpc.generate_seed(),
+            rep = self.single_change_rep
+        if rep is None:
+            rep = nano_rpc.generate_account(nano_rpc.generate_seed(),
                                             0)["account"]
 
         if source_private_key is not None:
@@ -131,7 +133,7 @@ class BlockGenerator():
             representative=representative,
             source_key=source_account_data["private"],
             destination_seed=destination_seed,
-            #destination_index=source_dest_account_data["index"] + 1,
+            # destination_index=source_dest_account_data["index"] + 1,
             accounts_keep_track=True,
             increment_index=True,
             number_of_accounts=number_of_accounts,
@@ -152,13 +154,15 @@ class BlockGenerator():
             ["private"],
             final_account_balance_raw=final_account_balance_raw,
             split_count=split_count)
-        return blocks_current_depth + blocks_next_depth  #blocks_current_depth.extends(blocks_next_depth)
+        # blocks_current_depth.extends(blocks_next_depth)
+        return blocks_current_depth + blocks_next_depth
 
     def get_spliting_depth(self, number_of_accounts, split_count):
         sum_l = 0
         for exponent in range(1, 128):
             sum_l = sum_l + (split_count**exponent)
-            if sum_l >= number_of_accounts: break
+            if sum_l >= number_of_accounts:
+                break
         return exponent
 
     def get_accounts_for_depth(self, split_count, splitting_depth):
@@ -187,7 +191,7 @@ class BlockGenerator():
                                                   split_count)
 
         if current_depth > splitting_depth:
-            return []  #end of recursion is reached
+            return []  # end of recursion is reached
         nano_rpc = self.get_nano_rpc_default()
 
         source_account_data = self.nano_lib.nanolib_account_data(
@@ -200,7 +204,8 @@ class BlockGenerator():
             print(
                 f"Creating {number_of_accounts} of {max_accounts_for_depth} possible accounts for current splitting_depth : {splitting_depth} and split_count {split_count}"
             )
-            self.single_account_open_counter = 0  #reset variable when multiple tests run successively
+            # reset variable when multiple tests run successively
+            self.single_account_open_counter = 0
             unittest.TestCase().assertGreater(
                 int(
                     nano_rpc.check_balance(
@@ -208,10 +213,10 @@ class BlockGenerator():
                 int(
                     raw_high_precision_multiply(number_of_accounts,
                                                 final_account_balance_raw)))
-            if representative is None:  #keep the same representative for all blocks
+            if representative is None:  # keep the same representative for all blocks
                 representative = nano_rpc.account_info(
                     source_account_data["account"]
-                )["representative"]  #keep the same representative for all opened accounts
+                )["representative"]  # keep the same representative for all opened accounts
 
         all_blocks = []
         for _ in range(0, split_count):
@@ -222,7 +227,7 @@ class BlockGenerator():
                                      final_account_balance_raw, split_count))
 
         if current_depth == 1:
-            self.single_account_open_counter = 0  #reset counter for next call
+            self.single_account_open_counter = 0  # reset counter for next call
         return all_blocks
 
     def get_hashes_from_blocks(self, blocks):
@@ -247,7 +252,7 @@ class BlockGenerator():
             "send",
             source_seed=source_seed,
             source_index=source_index,
-            destination_account=nano_rpc.get_account_data(
+            destination_account=nano_rpc.generate_account(
                 source_seed, source_index)["account"],
             amount_raw=amount_raw,
             read_in_memory=False,
@@ -277,7 +282,8 @@ class BlockGenerator():
                              max_depth=5,
                              current_depth=0):
         res = []
-        if current_depth >= max_depth: return res
+        if current_depth >= max_depth:
+            return res
 
         nano_rpc = self.get_nano_rpc_default()
         next_depth = current_depth + 1
@@ -286,17 +292,17 @@ class BlockGenerator():
         previous_dest_start_index = (forks_per_peer * peer_count *
                                      current_depth) + current_depth
 
-        #current_dest_start_index = (100 ** next_depth)
-        #previous_dest_start_index = 100 ** current_depth
+        # current_dest_start_index = (100 ** next_depth)
+        # previous_dest_start_index = 100 ** current_depth
 
         for i in range(0, forks_per_peer * peer_count):
             dest_index = current_dest_start_index + i
-            dest_account = nano_rpc.get_account_data(dest_seed,
+            dest_account = nano_rpc.generate_account(dest_seed,
                                                      dest_index)["account"]
             send_block = nano_rpc.create_block(
                 "send",
                 source_seed=source_seed,
-                #source_index=source_index if current_depth == 0 else 100 ** current_depth,
+                # source_index=source_index if current_depth == 0 else 100 ** current_depth,
                 source_index=source_index
                 if current_depth == 0 else previous_dest_start_index,
                 destination_account=dest_account,
@@ -332,251 +338,6 @@ class BlockGenerator():
         return res
 
 
-class BlockAsserts():
-    from multiprocessing import Value
-
-    tc = unittest.TestCase()
-
-    def __init__(self, rpc_url=None):
-        self.conf_p = ConfigParser()
-        rpc_url = self.conf_p.get_nodes_rpc(
-        )[0] if rpc_url is None else rpc_url
-        self.nano_rpc_default = NanoRpc(rpc_url)
-        self.nano_rpc_all = self.get_rpc_all()
-
-    def get_rpc_all(self):
-        return [NanoRpc(x) for x in self.conf_p.get_nodes_rpc()]
-
-    def get_rpc_custom(self, rpc_urls):
-        if rpc_urls is None: return self.get_rpc_all()
-        return [NanoRpc(x) for x in rpc_urls]
-
-    def assert_list_of_blocks_published(self,
-                                        list_of_blocks,
-                                        sync=True,
-                                        is_running=Value('i', False),
-                                        tps=450):
-        for blocks in list_of_blocks:
-            self.assert_blocks_published(blocks, sync=sync, tps=tps)
-        is_running.value = False
-
-    def assert_blocks_published(self, blocks, sync=True, tps=450):
-        blocks_to_publish_count = len(blocks)
-        rpc_block_count_start = int(
-            self.nano_rpc_default.block_count()["count"])
-
-        start_time = time.time()
-        interval = 1
-
-        for i in range(0, ceil(blocks_to_publish_count / tps)):
-            blocks_subset = list(islice(blocks, i * tps, i * tps + tps))
-            self.nano_rpc_default.publish_blocks(
-                blocks_subset, json_data=True,
-                sync=sync)  #we don't care about the result
-            sleep_duration = max(
-                0, start_time + (i + 1) * interval - time.time() +
-                ((len(blocks_subset) - tps) / tps))
-            time.sleep(sleep_duration)
-
-        self.assert_expected_block_count(blocks_to_publish_count +
-                                         rpc_block_count_start)
-
-    def assert_expected_block_count(self, expected_count, exit_after_s=5):
-        start_time = time.time()
-        #with timeout(exit_after_s, exception=RuntimeError) :
-        while True:
-            if time.time() - start_time > exit_after_s: break
-            rpc_block_count_end = int(
-                self.nano_rpc_default.block_count()["count"])
-            if rpc_block_count_end >= expected_count: break
-            time.sleep(0.2)
-        self.tc.assertGreaterEqual(
-            rpc_block_count_end,
-            expected_count)  #if other blocks arrive in the meantime
-
-    def assert_increasing_block_count(self, expected_count, exit_after_s=5):
-        stall_time = time.time()
-        #with timeout(exit_after_s, exception=RuntimeError) :
-        prev_block_count = self.nano_rpc_default.block_count()["count"]
-        while True:
-            if time.time() - stall_time > exit_after_s: break
-            rpc_block_count_end = int(
-                self.nano_rpc_default.block_count()["count"])
-            if rpc_block_count_end > prev_block_count:  #reset stall_time on increased block_count
-                stall_time = time.time()
-            if rpc_block_count_end >= expected_count: break
-            time.sleep(0.2)
-
-        self.tc.assertGreaterEqual(
-            rpc_block_count_end,
-            expected_count)  #if other blocks arrive in the meantime
-
-    def assert_single_block_confirmed(self,
-                                      hash,
-                                      sleep_on_stall_s=0.1,
-                                      exit_after_s=120,
-                                      exit_on_first_stall=False):
-        #Convert hash_string into list of 1 hash and reuse existing method that handles lists
-        block_hashes = []
-        block_hashes.append(hash)
-        return self.assert_blocks_confirmed(
-            block_hashes,
-            sleep_on_stall_s=sleep_on_stall_s,
-            exit_after_s=exit_after_s,
-            exit_on_first_stall=exit_on_first_stall)
-
-    def assert_blocks_confirmed(self,
-                                block_hashes,
-                                max_stall_duration_s=6 * 60,
-                                sleep_on_stall_s=5,
-                                stall_timeout_max=30 * 60,
-                                exit_after_s=60 * 60,
-                                exit_on_first_stall=False,
-                                log_to_console=False):
-        start_time = time.time()
-        block_count = len(block_hashes)
-        print(">>>DEBUG assert_blocks_confirmed:", block_hashes[0],
-              block_count)
-
-        timeout_inc = 0
-        try:
-            #with timeout(exit_after_s, exception=RuntimeError) :
-            confirmed_count = 0
-            while confirmed_count < block_count:
-                if time.time() - start_time > exit_after_s: break
-                last_confirmed_count = confirmed_count
-                confirmed_hashes = self.nano_rpc_default.block_confirmed_aio(
-                    block_hashes,
-                    ignore_errors=["Block not found"],
-                )
-                block_hashes = list(set(block_hashes) - confirmed_hashes)
-                confirmed_count = confirmed_count + len(confirmed_hashes)
-                if confirmed_count != block_count:
-                    if log_to_console:
-                        print(
-                            f"{confirmed_count}/{block_count} blocks confirmed",
-                            end="\r")
-                    time.sleep(sleep_on_stall_s)
-                if confirmed_count == last_confirmed_count:  # stalling block_count
-                    if exit_on_first_stall:
-                        return {
-                            "total_block_count": block_count,
-                            "confirmed_count": confirmed_count,
-                            "unconfirmed_count": block_count - confirmed_count
-                        }
-
-                    stall_timeout_max = stall_timeout_max - sleep_on_stall_s
-                    stall_timeout_max = timeout_inc + sleep_on_stall_s
-                    if timeout_inc >= max_stall_duration_s:
-                        raise ValueError(
-                            f"No new confirmations for {max_stall_duration_s}s... Fail blocks_confirmed"
-                        )  #break if no new confirmatiosn for 6 minutes (default)
-                else:  #reset stall timer
-                    timeout_inc = 0
-                if stall_timeout_max <= 0:
-                    raise ValueError(
-                        f"Max timeout of {stall_timeout_max} seconds reached")
-            first_hash = list(confirmed_hashes
-                              )[0] if confirmed_count > 0 else block_hashes[0]
-            print(
-                f"{confirmed_count}/{block_count} blocks confirmed in {round(time.time() - start_time, 2)} s [{first_hash}] ... [{self.nano_rpc_default.RPC_URL}]"
-            )
-        except RuntimeError as re:  #when timeout hits
-            self.tc.fail(str(re))
-        except ValueError as ve:
-            self.tc.fail(str(ve))
-
-        self.tc.assertEqual(confirmed_count, block_count)
-        return confirmed_count
-
-    def assert_expected_cemented(
-        self,
-        expected_count,
-        rpc_urls=None,
-        exit_after_s=30,
-    ):
-        rpcs = self.get_rpc_custom(rpc_urls)
-        break_on_ext_iteration = False
-        start_time = time.time()
-
-        while True:
-            if break_on_ext_iteration: break
-            min_cemented = 1e38
-            max_count = 1
-            time.sleep(0.2)
-            for nano_rpc in rpcs:
-                block_count = nano_rpc.block_count()
-                min_cemented = min(min_cemented, int(block_count["cemented"]))
-                max_count = max(max_count, int(block_count["count"]))
-            if expected_count == min_cemented:
-                #prints the report when 100% is reached
-                break_on_ext_iteration = True
-            if time.time() - start_time > exit_after_s:
-                self.tc.fail(
-                    f"Timout after {exit_after_s}s {min_cemented}/{expected_count} blocks confirmed "
-                )
-            print("cemented {:>8}/{:<8}  expected: {} [{:4}%]".format(
-                min_cemented,
-                max_count,
-                expected_count,
-                floor(min_cemented / max_count * 10000) / 100,
-                end="\r"))
-            time.sleep(2)
-
-    def assert_all_blocks_cemented(self):
-        for nano_rpc in self.nano_rpc_all:
-            block_count = nano_rpc.block_count()
-            self.tc.assertEqual(block_count["count"], block_count["cemented"])
-        return block_count
-
-    @staticmethod
-    def assert_blockgen_succeeded(blocks):
-        tc = unittest.TestCase()
-        if isinstance(blocks, list):
-            tc.assertEqual(len(list(filter(lambda x: x["success"], blocks))),
-                           len(blocks))
-        elif isinstance(blocks, dict):
-            tc.assertTrue(blocks["success"])
-        else:
-            tc.fail("Blocks must be of list or dict type")
-
-    def network_status(self, nodes_name: list = None):
-        if nodes_name == []: return ""
-
-        max_count = 0
-        nodes_block_count = []
-
-        if nodes_name is not None:
-            nodes_rpc = [
-                NanoRpc(self.conf_p.get_node_rpc(node)) for node in nodes_name
-            ]
-        else:
-            nodes_rpc = self.nano_rpc_all
-
-        for nano_rpc in nodes_rpc:
-            block_count = nano_rpc.block_count()
-            version_rpc_call = nano_rpc.version()
-            max_count = int(block_count["count"]) if int(
-                block_count["count"]) > max_count else max_count
-            node_name = self.conf_p.get_node_name_from_rpc_url(nano_rpc)
-            nodes_block_count.append({
-                "node_name": node_name,
-                "count": block_count["count"],
-                "cemented": block_count["cemented"]
-            })
-
-        node_version = f'{version_rpc_call["node_vendor"]} {version_rpc_call["build_info"].split(" ")[0]}'[
-            0:20]
-
-        report = [
-            '{:<16} {:<20} {:>6.2f}% synced | {}/{} blocks cemented'.format(
-                bc["node_name"], node_version,
-                floor(int(bc["cemented"]) / max_count * 10000) / 100,
-                bc["cemented"], bc["count"]) for bc in nodes_block_count
-        ]
-        return '\n' + '\n'.join(report)
-
-
 class BlockReadWrite():
 
     def __init__(self):
@@ -588,9 +349,12 @@ class BlockReadWrite():
                               hashes=False,
                               blocks=False):
         res = self.conf_rw.read_json(path)
-        if seeds: return res["s"]
-        if hashes: return res["h"]
-        if blocks: return res["b"]
+        if seeds:
+            return res["s"]
+        if hashes:
+            return res["h"]
+        if blocks:
+            return res["b"]
         return res
 
     def write_blocks_to_disk(self, rpc_block_list, path):
@@ -628,7 +392,7 @@ class BlockReadWrite():
         return list(map(lambda x: x["block"], rpc_block_list))
 
     def process_rpc_block_list(self, rpc_block_list):
-        BlockAsserts.assert_blockgen_succeeded(rpc_block_list)
+        self._assert_blockgen_succeeded(rpc_block_list)
         return {
             "hash_list": self.extract_hashes(rpc_block_list),
             "seed_list": self.extract_unique_seeds(rpc_block_list),
@@ -637,3 +401,13 @@ class BlockReadWrite():
 
     def is_nested_list(self, rpc_block_list):
         return any(isinstance(i, list) for i in rpc_block_list[:2])
+
+    def _assert_blockgen_succeeded(self, blocks):
+        tc = unittest.TestCase()
+        if isinstance(blocks, list):
+            tc.assertEqual(len(list(filter(lambda x: x["success"], blocks))),
+                           len(blocks))
+        elif isinstance(blocks, dict):
+            tc.assertTrue(blocks["success"])
+        else:
+            tc.fail("Blocks must be of list or dict type")

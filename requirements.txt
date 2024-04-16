@@ -4,5 +4,5 @@ tomli
 oyaml
 nano_lib_py
 extradict
-requests
+nanorpc
 

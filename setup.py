@@ -19,7 +19,7 @@ setup(name="nanomock",
           "oyaml",
           "nano_lib_py",
           "extradict",
-          "requests",
+          "nanorpc",
           'bitmath',
       ],
       entry_points={
