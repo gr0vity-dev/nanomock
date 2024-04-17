@@ -257,7 +257,6 @@ class NanoLocalManager:
                                          timeout: int = 10,
                                          max_timeout_s: int = 15) -> None:
         start_time = time.time()
-
         nodes_name = nodes_name or self.conf_p.get_nodes_name()
 
         async def get_unavailable_nodes(nodes: List[str], timeout: int) -> List[str]:
@@ -278,7 +277,8 @@ class NanoLocalManager:
             if len(nodes_to_check) > 0:
                 time.sleep(1)
 
-        logger.info(f"Nodes {nodes_name} reachable")
+        time.sleep(1)
+        logger.info("Nodes %s reachable", nodes_name)
 
     def online_containers_status(self, online_containers: List[str],
                                  total_nodes) -> str:

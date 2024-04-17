@@ -34,7 +34,6 @@ class TestMockNetwork:
             await cls.manager.execute_command("destroy")
             await cls.manager.execute_command("create")
             await cls.manager.execute_command("start")
-            await asyncio.sleep(1)
             await cls.manager.execute_command("status")
 
         asyncio.run(setup_network(cls))
@@ -67,7 +66,6 @@ class TestMockNetwork:
     @ pytest.mark.asyncio
     async def test_network_start(self):
         await self.manager.start_containers(["unittest_pr1"])
-        await asyncio.sleep(1)
         status = await self.manager.network_status()
         with open('unit_tests/data/expected_network_status.txt', 'r', encoding='utf-8') as f:
             expected_network_status = f.read()
@@ -85,7 +83,6 @@ class TestMockNetwork:
     @ pytest.mark.asyncio
     async def test_network_start_cmd(self):
         await self.manager.execute_command("start", nodes=["unittest_pr1"])
-        await asyncio.sleep(1)
         status = await self.manager.network_status()
         with open('unit_tests/data/expected_network_status.txt', 'r', encoding='utf-8') as f:
             expected_network_status = f.read()
