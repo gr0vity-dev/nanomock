@@ -152,10 +152,10 @@ class NanoRpc:
                                         destination_account=destination_account,
                                         amount_raw=amount_per_chunk_raw,
                                         in_memory=not broadcast)
-        return self.get_block_result(block,
-                                     broadcast,
-                                     source_seed=source_seed,
-                                     source_index=source_index)
+        return await self.get_block_result(block,
+                                           broadcast,
+                                           source_seed=source_seed,
+                                           source_index=source_index)
 
     async def create_change_block(self,
                                   source_seed,
@@ -169,10 +169,10 @@ class NanoRpc:
                                         representative=new_rep,
                                         in_memory=not broadcast)
 
-        return self.get_block_result(block,
-                                     broadcast,
-                                     source_seed=source_seed,
-                                     source_index=source_index)
+        return await self.get_block_result(block,
+                                           broadcast,
+                                           source_seed=source_seed,
+                                           source_index=source_index)
 
     async def create_change_block_pkey(self,
                                        source_private_key,
