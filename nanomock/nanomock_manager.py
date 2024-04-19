@@ -139,7 +139,7 @@ class NanoLocalManager:
         nodes = self.conf_p.get_nodes_name()
         if genesis_only:
             nodes = [nodes[0]]
-            logging.info("Only genesis node will be created")
+            logger.info("Only genesis node will be created")
         for node_name in self.conf_p.get_nodes_name():
             self._prepare_node_env(node_name)
 
@@ -240,12 +240,11 @@ class NanoLocalManager:
         rpc_url = self.conf_p.get_node_rpc(container)
         try:
             nano_rpc = NanoRpc(rpc_url)
-            logging.info("call _is_rpc_available")
             block_count = await nano_rpc.block_count()
             if block_count:
                 return container, True
         except Exception as e:
-            logging.warning(
+            logger.warning(
                 f"RPC {rpc_url} not yet reachable for node {container}: {str(e)}"
             )
 
@@ -368,6 +367,9 @@ class NanoLocalManager:
         init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
         for node_name in self.conf_p.get_nodes_name():
+
+            self._wait_for_rpc_availability([node_name])
+
             if node_name == self.conf_p.get_genesis_node_name():
                 await init_blocks.create_node_wallet(
                     self.conf_p.get_node_config(
