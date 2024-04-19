@@ -258,10 +258,13 @@ class NanoLocalManager:
                                          max_timeout_s: int = 15) -> None:
         start_time = time.time()
         nodes_name = nodes_name or self.conf_p.get_nodes_name()
+        logger.warning(nodes_name)
 
         async def get_unavailable_nodes(nodes: List[str], timeout: int) -> List[str]:
             results = await asyncio.gather(*(self._is_rpc_available(node, timeout) for node in nodes))
-            return [node for node, available in zip(nodes, results) if not available]
+            unavailable_nodes = [node for node, (node_name, available) in zip(
+                nodes, results) if not available]
+            return unavailable_nodes
 
         nodes_to_check = nodes_name.copy()
 
@@ -269,15 +272,12 @@ class NanoLocalManager:
             if not wait:
                 break
             nodes_to_check = await get_unavailable_nodes(nodes_to_check, timeout)
-
             if time.time() - start_time > max_timeout_s:
                 raise ValueError(
                     f"TIMEOUT: RPCs not reachable for nodes {nodes_to_check}")
-
             if len(nodes_to_check) > 0:
-                time.sleep(1)
+                await asyncio.sleep(1)  # Asynchronous sleep
 
-        time.sleep(1)
         logger.info("Nodes %s reachable", nodes_name)
 
     def online_containers_status(self, online_containers: List[str],
