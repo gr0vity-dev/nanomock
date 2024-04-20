@@ -367,7 +367,7 @@ class NanoLocalManager:
                                     self.conf_p.get_nodes_rpc()[0])
         for node_name in self.conf_p.get_nodes_name():
 
-            self._wait_for_rpc_availability([node_name])
+            await self._wait_for_rpc_availability([node_name])
 
             if node_name == self.conf_p.get_genesis_node_name():
                 await init_blocks.create_node_wallet(
