@@ -47,7 +47,7 @@ class NanoLocalManager:
     def _initialize_command_mapping(self):
         # (command_method , validation_method)
         return {
-            'create': (self.create_docker_compose_file, None),
+            'create': (self.init_containers, None),
             'start': (self.start_containers, None),
             'start_nodes': (self.start_all_nodes, None),
             'status': (self.network_status, None),
@@ -308,8 +308,7 @@ class NanoLocalManager:
         return status_msg + self._generate_network_status_report(
             nodes_name, nodes_block_count)
 
-    @log_on_success
-    async def create_docker_compose_file(self, genesis_only=False):
+    async def _create_docker_compose_file(self, genesis_only=False):
         extract_packaged_services_to_disk(self.nano_nodes_path)
         if genesis_only:
             genesis_name = self.conf_p.get_nodes_name()[0]
@@ -394,7 +393,7 @@ class NanoLocalManager:
 
     @log_on_success
     async def beta_create(self):
-        self.create_docker_compose_file(genesis_only=True)
+        await self.init_containers(genesis_only=True)
 
     @log_on_success
     async def beta_init(self):
@@ -418,16 +417,17 @@ class NanoLocalManager:
                 for file_path in node_path.rglob(file_pattern):
                     file_path.unlink()
 
-    async def init_containers(self):
-        await self.create_docker_compose_file()
-        self.build_containers()
+    @log_on_success
+    async def init_containers(self, genesis_only=False):
+        await self._create_docker_compose_file(genesis_only=genesis_only)
+        await self.build_containers()
 
     @log_on_success
     async def restart_containers(self, nodes: Optional[List[str]] = None):
         return None, self.docker_interface.compose_restart(nodes)
 
     @log_on_success
-    def build_containers(self):
+    async def build_containers(self):
         return None, self.docker_interface.compose_build()
 
     @log_on_success
