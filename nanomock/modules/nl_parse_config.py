@@ -372,6 +372,8 @@ class ConfigParser:
         # if dict (d), search for key (k) that has value (val) and remove key-value pairfrom dict
         if k in d and d[k] == val:
             d.pop(k)
+        if isinstance(d, str):
+            return None
         for v in d.values():
             if isinstance(v, list):
                 for el in v:
@@ -437,6 +439,15 @@ class ConfigParser:
         }
 
         return ctx
+
+    def get_connected_peers(self, node_name=None):
+        all_peers = self.preconfigured_peers
+        node_conf = self.get_node_config(node_name)
+        if node_name:
+            node_conf = self.get_node_config(node_name)
+            return node_conf.get("connected_peers") or all_peers
+
+        return all_peers
 
     def get_canary_pub_key(self):
         env = self.config_dict["env"]

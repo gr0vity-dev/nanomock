@@ -31,6 +31,7 @@ class TestMockNetwork:
         cls.nano_rpc: NanoRpc
 
         async def setup_network(cls):
+            await cls.manager.execute_command("down")
             await cls.manager.execute_command("destroy")
             await cls.manager.execute_command("create")
             await cls.manager.execute_command("start")

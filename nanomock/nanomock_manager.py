@@ -98,7 +98,7 @@ class NanoLocalManager:
             config_node = self._get_default("config_node")
 
         config_node["node"][
-            "preconfigured_peers"] = self.conf_p.preconfigured_peers
+            "preconfigured_peers"] = self.conf_p.get_connected_peers(node_name)
         config_node["node"]["enable_voting"] = self.conf_p.is_voting_enabled(
             node_name)
         return config_node

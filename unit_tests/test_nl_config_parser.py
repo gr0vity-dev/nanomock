@@ -26,6 +26,11 @@ class TestConfigParser(unittest.TestCase):
             }
         return extracted_values
 
+    def _get_config_parser(self, conf_dir="unit_tests/configs/mock_nl_config", conf_name="conf_edit_config.toml"):
+        config_parser = ConfigParser(conf_dir, conf_name)
+        conf_file = config_parser.conf_rw.read_toml(f"{conf_dir}/{conf_name}")
+        return config_parser, conf_file
+
     def _load_modify_conf_edit(self, nested_path, nested_value):
         conf_dir = "unit_tests/configs/mock_nl_config"
         conf_name = "conf_edit_config.toml"
@@ -189,6 +194,29 @@ class TestConfigParser(unittest.TestCase):
         loaded_config.pop(nested_path)
 
         assert loaded_config == modified_config
+
+    def test_connected_peers(self):
+        config_parser, _ = self._get_config_parser(
+            conf_name="connected_peers.toml")
+
+        assert config_parser.get_connected_peers(
+            "unittest_genesis") == ["unittest_pr1"]
+        assert config_parser.get_connected_peers(
+            "unittest_pr1") == ["unittest_pr2"]
+        assert config_parser.get_connected_peers(
+            "unittest_pr2") == ["unittest_pr1", "unittest_genesis"]
+
+    def test_connected_peers_2(self):
+        config_parser, conf_file = self._get_config_parser(
+            conf_name="connected_peers.toml")
+
+        nested_path = "nanolooker_enable"
+        nested_value = False
+
+        modified_config = config_parser.modify_nanolocal_config(
+            nested_path, nested_value, save=False)
+
+        assert conf_file == modified_config
 
 
 if __name__ == '__main__':
