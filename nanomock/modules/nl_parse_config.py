@@ -1029,6 +1029,20 @@ class ConfigParser:
             # Update the container's environment variables with those specified for the node
             container['environment'].update(env_vars)
 
+    def add_container_node_flags(self, container, node_name):
+        """
+        Adjust the command line for the container based on the node flags specified in the config file,
+        ensuring that '-l' is always the last option.
+        """
+        node_flags = self.get_config_tag("node_flags", node_name, [])
+
+        # '-l' needs to at the end of the command
+        base_command = container['command'].replace(' -l', '')
+        full_command = f"{base_command} {' '.join(node_flags)} -l"
+        container['command'] = full_command
+
+
+
     def enable_logging_to_file(self, container):
         if self.config_dict.get("filelog_enable", False):
             container['logging'] = {
@@ -1079,6 +1093,7 @@ class ConfigParser:
             self.add_container_blkio_config(container, node_name)
             self.add_container_cpu_memory_config(container, node_name)
             self.add_container_env_config(container, node_name)
+            self.add_container_node_flags(container, node_name)
             self.enable_logging_to_file(container)
 
     def compose_set_node_ports(self, node_name):

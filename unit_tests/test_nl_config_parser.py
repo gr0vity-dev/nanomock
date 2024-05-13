@@ -217,6 +217,28 @@ class TestConfigParser(unittest.TestCase):
             nested_path, nested_value, save=False)
 
         assert conf_file == modified_config
+    
+    def test_add_container_node_flags(self):
+        
+        config_parser = ConfigParser("unit_tests/configs/mock_nl_config",
+                                     "node_flags.toml")
+        config_parser.set_docker_compose()
+        
+        commands = []
+        for service_name, service_config in config_parser.compose_dict["services"].items():
+            commands.append(service_config.get("command"))
+            
+        # Expected command after appending node_flags
+        expected_command_0 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 --flag_2 -l"
+        expected_command_1 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 -l"
+        expected_command_2 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_3 -l"
+       
+            
+        # Assert to check if the command in the container is as expected
+        self.assertEqual(expected_command_0, commands[0])
+        self.assertEqual(expected_command_1, commands[1])
+        self.assertEqual(expected_command_2, commands[2])
+        self.assertEqual(len(commands), 3)
 
 
 if __name__ == '__main__':
