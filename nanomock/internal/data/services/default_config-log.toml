@@ -1,0 +1,12 @@
+[log]
+default_level = "info"
+
+[log.console]
+enable = true
+
+[log.file]
+enable = true
+max_size = 25000000000
+
+[log.levels]
+bootstrap = "info"

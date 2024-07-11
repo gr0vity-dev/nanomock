@@ -29,12 +29,12 @@
         "blkio_config": {
             "device_read_bps": [
                 {
-                    "rate": 50000000
+                    "rate": 500000
                 }
             ],
             "device_write_bps": [
                 {
-                    "rate": 50000000
+                    "rate": 250000
                 }
             ],
             "device_read_iops": [
@@ -44,7 +44,7 @@
             ],
             "device_write_iops": [
                 {
-                    "rate": 100
+                    "rate": 50
                 }
             ]
         },

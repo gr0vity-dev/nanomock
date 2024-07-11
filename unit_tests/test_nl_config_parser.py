@@ -30,6 +30,8 @@ class TestConfigParser(unittest.TestCase):
         config_parser = ConfigParser(conf_dir, conf_name)
         conf_file = config_parser.conf_rw.read_toml(f"{conf_dir}/{conf_name}")
         return config_parser, conf_file
+    
+       
 
     def _load_modify_conf_edit(self, nested_path, nested_value):
         conf_dir = "unit_tests/configs/mock_nl_config"
@@ -239,6 +241,28 @@ class TestConfigParser(unittest.TestCase):
         self.assertEqual(expected_command_1, commands[1])
         self.assertEqual(expected_command_2, commands[2])
         self.assertEqual(len(commands), 3)
+    
+    # def test_key_in_compose__log_level(self):
+        
+    #     conf_dir = "unit_tests/configs/mock_nl_config"
+    #     conf_name = "conf_edit_config_test.toml"        
+    #     config_parser = ConfigParser(conf_dir, conf_name)
+        
+        
+    #     # nested_path = "representatives.log_level"
+    #     # nested_value = "trace"
+
+    #     # config_parser.modify_nanolocal_config(nested_path,nested_value)        
+    #     config_parser.set_docker_compose()
+        
+        
+    #     log_levels = []
+    #     for service_name, service_config in config_parser.compose_dict["services"].items():           
+    #         log_levels.append(service_config.get("log_level"))        
+
+    #     expected_log_level = "trace"
+    #     self.assertEqual(expected_log_level, log_levels[0])
+        
 
 
 if __name__ == '__main__':

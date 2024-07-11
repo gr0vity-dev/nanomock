@@ -5,7 +5,10 @@ import time
 import inspect
 import asyncio
 import os
+import shutil
 from pathlib import Path
+from asyncio import TimeoutError
+
 import logging
 
 from nanomock.internal.dependency_checker import DependencyChecker
@@ -38,6 +41,7 @@ class NanoLocalManager:
         self.nodes_data_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest"
         self.config_node_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest/config-node.toml"
         self.config_rpc_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest/config-rpc.toml"
+        self.config_log_path = f"{self.nano_nodes_path}/{{node_name}}/NanoTest/config-log.toml"
 
         os.makedirs(self.nano_nodes_path, exist_ok=True)
 
@@ -67,19 +71,21 @@ class NanoLocalManager:
         }
 
     def _get_default(self, config_name):
-        """ Load config with default values"""
-        # minimal node config if no file is provided in the nl_config.toml
-        if config_name == "config_node":
-            default_config_path = os.path.join(self.services_dir,
-                                               "default_config-node.toml")
-            return self.conf_rw.read_toml(default_config_path,
-                                          is_packaged=True)
-        elif config_name == "config_rpc":
-            default_rpc_path = os.path.join(self.services_dir,
-                                            "default_config-rpc.toml")
-            return self.conf_rw.read_toml(default_rpc_path, is_packaged=True)
-        else:
-            return {}
+        # Mapping of config names to their respective default file names
+        default_paths = {
+            "config_node": "default_config-node.toml",
+            "config_rpc": "default_config-rpc.toml",
+            "config_log": "default_config-log.toml"
+        }
+
+        # Get the default path if the config name is valid
+        default_file = default_paths.get(config_name)
+
+        if default_file:
+            default_path = os.path.join(self.services_dir, default_file)
+            return self.conf_rw.read_toml(default_path, is_packaged=True)
+
+        return {}
 
     def _generate_docker_compose_env_file(self):
         env_variables = self.conf_p.get_docker_compose_env_variables()
@@ -89,12 +95,23 @@ class NanoLocalManager:
         self.conf_p.set_docker_compose()
         self.conf_p.write_docker_compose()
 
+    def _set_config_log_file(self, node_name):
+        config_log = self.conf_p.get_config_from_path(node_name, "config_log_path")
+        if config_log is None:
+            logger.debug( "No config-log.toml found. minimal version was created")
+            config_log = self._get_default("config_log")
+        config_log["log"]["default_level"] = self.conf_p.get_log_level(node_name)
+        return config_log
+
+    def _generate_config_log_file(self, node_name):
+        config_log = self._set_config_log_file(node_name)
+        self.conf_rw.write_toml(
+            self.config_log_path.format(node_name=node_name), config_log)
+
     def _set_config_node_file(self, node_name):
-        config_node = self.conf_p.get_config_from_path(node_name,
-                                                       "config_node_path")
+        config_node = self.conf_p.get_config_from_path(node_name, "config_node_path")
         if config_node is None:
-            logger.warning(
-                "No config-node.toml found. minimal version was created")
+            logger.debug( "No config-node.toml found. minimal version was created")
             config_node = self._get_default("config_node")
 
         config_node["node"][
@@ -109,11 +126,9 @@ class NanoLocalManager:
             self.config_node_path.format(node_name=node_name), config_node)
 
     def _generate_config_rpc_file(self, node_name):
-        config_rpc = self.conf_p.get_config_from_path(node_name,
-                                                      "config_rpc_path")
+        config_rpc = self.conf_p.get_config_from_path(node_name, "config_rpc_path")
         if config_rpc is None:
-            logger.warning(
-                "No config-rpc.toml found. minimal version was created")
+            logger.debug( "No config-rpc.toml found. minimal version was created")
             config_rpc = self._get_default("config_rpc")
 
         self.conf_rw.write_toml(
@@ -149,6 +164,7 @@ class NanoLocalManager:
         self._create_node_folders(node_name)
         self._generate_config_node_file(node_name)
         self._generate_config_rpc_file(node_name)
+        self._generate_config_log_file(node_name)
         self._generate_nanomonitor_config_file(node_name)
 
     def _online_containers(self, node_names: List[str]) -> List[str]:
@@ -168,33 +184,35 @@ class NanoLocalManager:
         online_count = len(online_containers)
         return online_count
 
-    async def _get_nodes_block_counts(
-            self, nodes_name: List[str]) -> List[Dict[str, Union[str, int]]]:
+    async def _get_nodes_block_counts(self, nodes_name: List[str]) -> List[Dict[str, Union[str, int]]]:
         nodes_block_count = []
 
         nodes_rpc = ([
             NanoRpc(self.conf_p.get_node_rpc(node)) for node in nodes_name
         ] if nodes_name is not None else self._get_all_rpc())
 
-        for node_rpc in nodes_rpc:
+        async def get_block_count_for_node(node_rpc):
             try:
-                block_count = await node_rpc.block_count()
-                version_rpc_call = await node_rpc.version()
+                block_count = await asyncio.wait_for(node_rpc.block_count(), timeout=2.0)
+                version_rpc_call = await asyncio.wait_for(node_rpc.version(), timeout=2.0)
                 if not (block_count or version_rpc_call):
-                    continue
-                node_name = self.conf_p.get_node_name_from_rpc(
-                    node_rpc)
+                    return None
+                node_name = self.conf_p.get_node_name_from_rpc(node_rpc)
                 count = int(block_count["count"])
-                nodes_block_count.append({
+                return {
                     "node_name": node_name,
                     "count": count,
                     "cemented": block_count["cemented"],
                     "version": version_rpc_call
-                })
-            except:
-                pass
+                }
+            except (asyncio.TimeoutError, Exception):
+                return None
 
+        results = await asyncio.gather(*(get_block_count_for_node(node_rpc) for node_rpc in nodes_rpc))
+        nodes_block_count = [result for result in results if result is not None]
         return nodes_block_count
+
+
 
     def _generate_network_status_report(
             self, nodes: List[str],
@@ -230,6 +248,7 @@ class NanoLocalManager:
             report.append(report_line)
 
         return '\n' + '\n'.join(report)
+
 
     def _get_all_rpc(self):
         return [NanoRpc(x) for x in self.conf_p.get_nodes_rpc()]
@@ -360,13 +379,13 @@ class NanoLocalManager:
         responses = await asyncio.gather(*tasks)
         return None, json.dumps(responses, indent=2)
 
+
     @log_on_success
     async def init_wallets(self):
-        # self.start_nodes('all')  #fixes a bug on mac m1
         init_blocks = InitialBlocks(self.conf_p,
                                     self.conf_p.get_nodes_rpc()[0])
-        for node_name in self.conf_p.get_nodes_name():
 
+        async def process_node(node_name):
             await self._wait_for_rpc_availability([node_name])
 
             if node_name == self.conf_p.get_genesis_node_name():
@@ -381,8 +400,24 @@ class NanoLocalManager:
                     node_name,
                     seed=self.conf_p.get_node_config(node_name)["seed"])
 
+        node_names = self.conf_p.get_nodes_name()
+        await asyncio.gather(*(process_node(node_name) for node_name in node_names))
+
         # return without logging for unit tests
         return init_blocks.logger.pop("InitialBlocks")
+
+    async def _create_wallet(self, node_name, init_blocks):
+        # Extract wallet creation logic into a separate coroutine
+        if node_name == self.conf_p.get_genesis_node_name():
+            await init_blocks.create_node_wallet(
+                self.conf_p.get_node_config(self.conf_p.get_genesis_node_name())["rpc_url"],
+                self.conf_p.get_genesis_node_name(),
+                private_key=self.conf_p.config_dict["genesis_key"])
+        else:
+            await init_blocks.create_node_wallet(
+                self.conf_p.get_node_config(node_name)["rpc_url"],
+                node_name,
+                seed=self.conf_p.get_node_config(node_name)["seed"])
 
     @log_on_success
     async def init_nodes(self):
@@ -411,11 +446,14 @@ class NanoLocalManager:
         for node in nodes_to_process:
             node_path = Path(self.nano_nodes_path) / node if nodes else Path(
                 self.nano_nodes_path)
-            files_to_remove = ['data.ldb', 'wallets.ldb']
+            files_to_remove = ['data.ldb', 'wallets.ldb', 'rocksdb']
 
             for file_pattern in files_to_remove:
                 for file_path in node_path.rglob(file_pattern):
-                    file_path.unlink()
+                    if file_path.is_dir():
+                        shutil.rmtree(file_path)
+                    else:
+                        file_path.unlink()
 
     @log_on_success
     async def init_containers(self, genesis_only=False):

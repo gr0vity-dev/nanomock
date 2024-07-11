@@ -1,0 +1,31 @@
+genesis_key = "12C91837C846F875F56F67CD83040A832CFC0F131AF3DFF9E502C0D43F5D2D15"
+canary_key = "FB4E458CB13508353C5B2574B82F1D1D61367F61E88707F773F068FF90050BEE"
+epoch_count = 2
+burn_amount = "140282366920938463463374607431768211454"
+NANO_TEST_EPOCH_1 = "0xfff0000000000000"
+NANO_TEST_EPOCH_2 = "0x000000000000000f"
+NANO_TEST_EPOCH_2_RECV = "0x000000000000000f"
+NANO_TEST_MAGIC_NUMBER = "LC"
+remote_address = "127.0.0.1"
+nanolooker_enable = false
+nanolooker_port = 42900
+nanolooker_node_name = "genesis"
+nanolooker_mongo_port = 27017
+
+[representatives]
+node_prefix = "unittest"
+host_port_peer = 44900
+host_port_rpc = 45900
+host_port_ws = 47900
+docker_tag = "nanocurrency/nano:V26.1"
+log_level = "trace"
+
+[[representatives.nodes]]
+name = "pr1"
+seed = "1110000000000000000000000000000000000000000000000000000000000001"
+vote_weight_percent = 50
+
+[[representatives.nodes]]
+name = "pr2"
+seed = "1110000000000000000000000000000000000000000000000000000000000002"
+vote_weight_percent = 50

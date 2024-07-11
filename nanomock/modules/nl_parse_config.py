@@ -194,7 +194,7 @@ class ConfigParser:
             # Add ports for each node
             node["name"] = self.get_node_prefix() + node["name"]
 
-            if self.config_dict["env"] == "gcloud":
+            if self.get_env() in ( "gcloud" , "beta" ):
                 host_port_inc = 0
 
             node["host_port_peer"] = self.config_dict["representatives"][
@@ -268,6 +268,7 @@ class ConfigParser:
         # traffic control
         self.config_dict.setdefault(
             "tc_enable", str2bool(self.config_dict.get("tc_enable", False)))
+
 
         # enablel ogging to file
         self.config_dict.setdefault(
@@ -368,6 +369,15 @@ class ConfigParser:
             f"{node_name} undefined in {self.nl_config_path}\nValid names:{self.get_nodes_name()}"
         )
 
+    def get_log_level(self, node_name):
+        node_conf = self.get_node_config(node_name)
+        if node_conf:
+            self.logger.info(f'Log level : {node_conf.get("log_level", "default")}')
+            return node_conf.get("log_level", "info")
+        raise ValueError(
+            f"{node_name} undefined in {self.nl_config_path}\nValid names:{self.get_nodes_name()}"
+        )
+
     def _remove_keys_with_value(self, d, k, val):
         # if dict (d), search for key (k) that has value (val) and remove key-value pairfrom dict
         if k in d and d[k] == val:
@@ -431,7 +441,7 @@ class ConfigParser:
                 for node_conf in self.get_nodes_config()
             },
             'repservurl': '',
-            'genesis_pub': self.get_genesis_account_data()["public"],
+            'genesis_pub': self.get_genesis_pubkey(),
             'epoch_v2_signing_account':
             self.config_dict["NANO_TEST_CANARY_PUB"],
             'genesis_block': self.get_genesis_block(as_json=True),
@@ -439,6 +449,7 @@ class ConfigParser:
         }
 
         return ctx
+
 
     def get_connected_peers(self, node_name=None):
         all_peers = self.preconfigured_peers
@@ -450,7 +461,7 @@ class ConfigParser:
         return all_peers
 
     def get_canary_pub_key(self):
-        env = self.config_dict["env"]
+        env = self.get_env()
         canary_pub = ""
         if env in ["gcloud", "local"]:
             canary_pub = self.nano_lib.key_expand(
@@ -465,12 +476,24 @@ class ConfigParser:
             )
         return canary_pub
 
+    def get_env(self):
+        return self.config_dict["env"]
+
     def get_network_name(self):
         return self.compose_dict["networks"]["nano-local"]["name"]
 
+    def get_genesis_pubkey(self):
+        env = self.get_env()
+        if env in ["gcloud", "local"]:
+            return self.get_genesis_account_data()["public"]
+        elif env == "beta":
+            return "259A438A8F9F9226130C84D902C237AF3E57C0981C7D709C288046B110D8C8AC"
+        elif env == "live":
+            return "E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA"
+
     def get_genesis_block(self, as_json=False):
 
-        env = self.config_dict["env"]
+        env = self.get_env()
 
         if env in ["gcloud", "local"]:
             genesis_account = self.get_genesis_account_data()
@@ -489,18 +512,12 @@ class ConfigParser:
 
         elif env == "beta":
             json_block = str({
-                "type":
-                "open",
-                "source":
-                "259A43ABDB779E97452E188BA3EB951B41C961D3318CA6B925380F4D99F0577A",
-                "representative":
-                "nano_1betagoxpxwykx4kw86dnhosc8t3s7ix8eeentwkcg1hbpez1outjrcyg4n1",
-                "account":
-                "nano_1betagoxpxwykx4kw86dnhosc8t3s7ix8eeentwkcg1hbpez1outjrcyg4n1",
-                "work":
-                "79d4e27dc873c6f2",
-                "signature":
-                "4BD7F96F9ED2721BCEE5EAED400EA50AD00524C629AE55E9AFF11220D2C1B00C3D4B3BB770BF67D4F8658023B677F91110193B6C101C2666931F57046A6DB806"
+                "account": "nano_1betag7az9wk6rbis38s1d35hdsycz1bi95xg4g4j148p6afjk7embcurda4",
+                "representative": "nano_1betag7az9wk6rbis38s1d35hdsycz1bi95xg4g4j148p6afjk7embcurda4",
+                "signature": "BC588273AC689726D129D3137653FB319B6EE6DB178F97421D11D075B46FD52B6748223C8FF4179399D35CB1A8DF36F759325BD2D3D4504904321FAFB71D7602",
+                "source": "259A438A8F9F9226130C84D902C237AF3E57C0981C7D709C288046B110D8C8AC",
+                "type": "open",
+                "work": "e87a3ce39b43b84c"
             }).replace("'", '"')
 
         elif env == "live":
@@ -840,7 +857,7 @@ class ConfigParser:
                 "container_name"] = container_name
 
             self.compose_dict["services"][container_name][
-                "command"] = f'--rpchost {host_ip} --rpc_port {node_rpc_port} --push_gateway {prom_gateway} --hostname {node["name"]} --runid {prom_runid} --interval 2'
+                "command"] = f'--host {host_ip} --port {node_rpc_port} --push_gateway {prom_gateway} --hostname {node["name"]} --runid {prom_runid} --interval 2'
 
             self.compose_dict["services"][container_name][
                 "pid"] = f'service:{node["name"]}'
@@ -957,11 +974,17 @@ class ConfigParser:
                 "device_read_iops": "50000",
                 "device_write_iops": "40000",
             },
+            "SSD_LOW": {
+                "device_read_bps": "200MB",
+                "device_write_bps": "150MB",
+                "device_read_iops": "5000",
+                "device_write_iops": "4000",
+            },
             "HDD": {
-                "device_read_bps": "50MB",
-                "device_write_bps": "50MB",
+                "device_read_bps": "500kB",
+                "device_write_bps": "250kB",
                 "device_read_iops": "100",
-                "device_write_iops": "100",
+                "device_write_iops": "50",
             },
         }
         return disk_defaults.get(disk_type.upper(), None)

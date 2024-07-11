@@ -101,7 +101,16 @@ class TestMockNetwork:
     @ pytest.mark.asyncio
     async def test_network_init_wallets(self):
         log_string = await self.manager.init_wallets()
-        log_output = "\n".join(log_string)
+        # Sort log_string by node name (unittest_genesis, unittest_pr1, unittest_pr2)
+        sorted_log_string = sorted(
+            log_string,
+            key=lambda x: (
+                '0' if 'unittest_genesis' in x else
+                '1' if 'unittest_pr1' in x else
+                '2'
+            )
+        )
+        log_output = "\n".join(sorted_log_string)
 
         # Define the pattern for the expected log output
         pattern = (
