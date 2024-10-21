@@ -2,9 +2,9 @@ version: '2.4'
 
 services:
   default_exporter:
-    build:
-      context: .
-      dockerfile: ./services/promexporter/Dockerfile    
+    image: gr0v1ty/nano-prom-exporter:853a6c2f0934c99fe5a388994ddf2f3176139716
+    #pwo histograms
+    #image: gr0v1ty/nano-prom-exporter:d3cce824c28125bd8f5af3b768b9e4c1f686d26b
     container_name: ${node_name}_exporter
     restart: unless-stopped
     environment:

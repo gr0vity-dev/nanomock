@@ -5,7 +5,7 @@ WORKDIR /
 RUN apk update
 RUN apk add git gcc musl-dev linux-headers
 
-ARG hash_value=45e3efcd090f93e416504403fbf1474a753873db
+ARG hash_value=853a6c2f0934c99fe5a388994ddf2f3176139716
 RUN git clone https://github.com/gr0vity-dev/bnano-prom-exporter.git app
 
 WORKDIR /app
