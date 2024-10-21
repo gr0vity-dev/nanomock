@@ -194,7 +194,7 @@ class ConfigParser:
             # Add ports for each node
             node["name"] = self.get_node_prefix() + node["name"]
 
-            if self.get_env() in ( "gcloud" , "beta" ):
+            if self.get_env() in ( "gcloud" , "beta" , "live" ):
                 host_port_inc = 0
 
             node["host_port_peer"] = self.config_dict["representatives"][
@@ -522,18 +522,12 @@ class ConfigParser:
 
         elif env == "live":
             json_block = str({
-                "type":
-                "open",
-                "source":
-                "E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA",
-                "representative":
-                "xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
-                "account":
-                "xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
-                "work":
-                "62f05417dd3fb691",
-                "signature":
-                "9F0C933C8ADE004D808EA1985FA746A7E95BA2A38F867640F53EC8F180BDFE9E2C1268DEAD7C2664F356E37ABA362BC58E46DBA03E523A7B5A19E4B6EB12BB02"
+                "type":"open",
+                "source":"E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA",
+                "representative":"xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
+                "account":"xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
+                "work":"62f05417dd3fb691",
+                "signature":"9F0C933C8ADE004D808EA1985FA746A7E95BA2A38F867640F53EC8F180BDFE9E2C1268DEAD7C2664F356E37ABA362BC58E46DBA03E523A7B5A19E4B6EB12BB02"
             }).replace("'", '"')
         else:
             raise ValueError(
@@ -840,6 +834,14 @@ class ConfigParser:
 
         # Create 1 exporter per node
         for node in self.config_dict["representatives"]["nodes"]:
+
+            node_prom_enable = node.get("prom_enable", "true").lower() == "true"
+            if not node_prom_enable:
+                self.enabled_services.append(
+                    f'Prometheus exporter disabled for node {node["name"]}'
+                )
+                continue  # Skip exporter setup for this node
+
             node_config = self.get_node_config(node["name"])
             node_rpc_port = node_config["host_port_rpc"]
 
@@ -981,8 +983,8 @@ class ConfigParser:
                 "device_write_iops": "4000",
             },
             "HDD": {
-                "device_read_bps": "500kB",
-                "device_write_bps": "250kB",
+                "device_read_bps": "100MB",
+                "device_write_bps": "50MB",
                 "device_read_iops": "100",
                 "device_write_iops": "50",
             },
