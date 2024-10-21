@@ -273,7 +273,7 @@ class NanoLocalManager:
                                          nodes_name: List[str] = None,
                                          wait: bool = True,
                                          timeout: int = 10,
-                                         max_timeout_s: int = 15) -> None:
+                                         max_timeout_s: int = 45) -> None:
         start_time = time.time()
         nodes_name = nodes_name or self.conf_p.get_nodes_name()
         logger.warning(nodes_name)
