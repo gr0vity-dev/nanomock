@@ -11,24 +11,22 @@ nanolooker_enable = false
 nanolooker_port = 42900
 nanolooker_node_name = "genesis"
 nanolooker_mongo_port = 27017
+tcpdump_enable = false
+tc_enable = false
 
 [representatives]
 node_prefix = "unittest"
 host_port_peer = 44900
 host_port_rpc = 45900
 host_port_ws = 47900
-#config_node_path = "./nanolocal/services/default_config-node-voting_disabled.toml"
-#config_rpc_path = "./nanolocal/services/default_config-rpc.toml"
 docker_tag = "nanocurrency/nano:V26.1"
 
 [[representatives.nodes]]
 name = "pr1"
 seed = "1110000000000000000000000000000000000000000000000000000000000001"
 vote_weight_percent = 50
-#config_node_path = "./nanolocal/services/default_config-node.toml"
 
 [[representatives.nodes]]
 name = "pr2"
 seed = "1110000000000000000000000000000000000000000000000000000000000002"
 vote_weight_percent = 50
-#config_node_path = "./nanolocal/services/default_config-node.toml"

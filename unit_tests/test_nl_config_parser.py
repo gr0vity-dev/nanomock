@@ -2,6 +2,7 @@ import unittest
 import json
 from nanomock.modules.nl_parse_config import ConfigParser
 import platform
+import time
 
 os_name = platform.system()
 
@@ -30,8 +31,8 @@ class TestConfigParser(unittest.TestCase):
         config_parser = ConfigParser(conf_dir, conf_name)
         conf_file = config_parser.conf_rw.read_toml(f"{conf_dir}/{conf_name}")
         return config_parser, conf_file
-    
-       
+
+
 
     def _load_modify_conf_edit(self, nested_path, nested_value):
         conf_dir = "unit_tests/configs/mock_nl_config"
@@ -98,6 +99,7 @@ class TestConfigParser(unittest.TestCase):
             node["new_key"] = nested_value
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_delete_wildcard(self):
         nested_path = "representatives.nodes.*.vote_weight_percent"
@@ -112,6 +114,7 @@ class TestConfigParser(unittest.TestCase):
                      ) if "vote_weight_percent" in node else None
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_modify_wildcard(self):
         nested_path = "representatives.nodes.*.vote_weight_percent"
@@ -124,6 +127,7 @@ class TestConfigParser(unittest.TestCase):
             node["vote_weight_percent"] = nested_value
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_insert_nested_key(self):
         nested_path = "representatives.ney_key"
@@ -148,6 +152,7 @@ class TestConfigParser(unittest.TestCase):
         loaded_config["representatives"]["docker_tag"] = nested_value
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_delete_nested_key(self):
         nested_path = "representatives.docker_tag"
@@ -160,6 +165,7 @@ class TestConfigParser(unittest.TestCase):
         loaded_config["representatives"].pop("docker_tag")
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_insert_flat(self):
         nested_path = "new_key"
@@ -172,6 +178,7 @@ class TestConfigParser(unittest.TestCase):
         loaded_config["new_key"] = nested_value
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_modify_flat(self):
         nested_path = "nanolooker_enable"
@@ -184,6 +191,7 @@ class TestConfigParser(unittest.TestCase):
         loaded_config["nanolooker_enable"] = nested_value
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_conf_edit_delete_flat(self):
         nested_path = "nanolooker_enable"
@@ -196,6 +204,7 @@ class TestConfigParser(unittest.TestCase):
         loaded_config.pop(nested_path)
 
         assert loaded_config == modified_config
+        self._load_modify_conf_edit(nested_path, "")
 
     def test_connected_peers(self):
         config_parser, _ = self._get_config_parser(
@@ -219,50 +228,64 @@ class TestConfigParser(unittest.TestCase):
             nested_path, nested_value, save=False)
 
         assert conf_file == modified_config
-    
+        self._load_modify_conf_edit(nested_path, "")
+
     def test_add_container_node_flags(self):
-        
+
         config_parser = ConfigParser("unit_tests/configs/mock_nl_config",
                                      "node_flags.toml")
         config_parser.set_docker_compose()
-        
+
         commands = []
         for service_name, service_config in config_parser.compose_dict["services"].items():
             commands.append(service_config.get("command"))
-            
+
         # Expected command after appending node_flags
         expected_command_0 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 --flag_2 -l"
         expected_command_1 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 -l"
         expected_command_2 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_3 -l"
-       
-            
+
+
         # Assert to check if the command in the container is as expected
         self.assertEqual(expected_command_0, commands[0])
         self.assertEqual(expected_command_1, commands[1])
         self.assertEqual(expected_command_2, commands[2])
         self.assertEqual(len(commands), 3)
-    
+
+    def test_performance(self):
+        start_time = time.time()
+        config_parser, conf_file = self._get_config_parser(
+            conf_name="connected_peers.toml")
+
+        # Call your function here with appropriate arguments
+        # Example:
+        config_parser.modify_nanolocal_config('representatives.new_key', 'some_value/with_sp@cial_cHars')
+        end_time = time.time()
+        execution_time = end_time - start_time
+        assert execution_time < 0.1, f"Function took too long: {execution_time} seconds"
+
+
     # def test_key_in_compose__log_level(self):
-        
+
     #     conf_dir = "unit_tests/configs/mock_nl_config"
-    #     conf_name = "conf_edit_config_test.toml"        
+    #     conf_name = "conf_edit_config_test.toml"
     #     config_parser = ConfigParser(conf_dir, conf_name)
-        
-        
+
+
     #     # nested_path = "representatives.log_level"
     #     # nested_value = "trace"
 
-    #     # config_parser.modify_nanolocal_config(nested_path,nested_value)        
+    #     # config_parser.modify_nanolocal_config(nested_path,nested_value)
     #     config_parser.set_docker_compose()
-        
-        
+
+
     #     log_levels = []
-    #     for service_name, service_config in config_parser.compose_dict["services"].items():           
-    #         log_levels.append(service_config.get("log_level"))        
+    #     for service_name, service_config in config_parser.compose_dict["services"].items():
+    #         log_levels.append(service_config.get("log_level"))
 
     #     expected_log_level = "trace"
     #     self.assertEqual(expected_log_level, log_levels[0])
-        
+
 
 
 if __name__ == '__main__':

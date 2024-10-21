@@ -7,6 +7,7 @@ from subprocess import CalledProcessError
 import re
 from pathlib import Path
 import asyncio
+import time
 
 
 @pytest.fixture(scope="class", autouse=True)
@@ -134,6 +135,43 @@ class TestMockNetwork:
         assert wallet_files
         assert keep_file_path.exists()
 
+    @pytest.mark.asyncio
+    async def test_conf_edit(self):
+        # Define a sample payload
+        payload_1 = {
+            "path": "tcpdump_enable",
+            "value": False
+        }
+        payload_2 = {
+            "path": "tc_enable",
+            "value": False
+        }
+
+        # Start timing
+        start_time = time.time()
+
+        # Call the conf_edit method
+        result_1 = await self.manager.conf_edit(payload_1)
+        result_2 = await self.manager.conf_edit(payload_2)
+
+        # End timing
+        end_time = time.time()
+
+        # Calculate execution time in milliseconds
+        execution_time = (end_time - start_time) * 1000
+
+        # Assert that the method returns True
+        assert result_1 == True, "conf_edit method should return True"
+        assert result_2 == True, "conf_edit method should return True"
+
+        # Assert that execution time is less than 500 ms
+        assert execution_time < 100, f"Execution time ({execution_time:.2f} ms) exceeded 500 ms"
+
+        # Optionally, print the execution time
+        print(f"conf_edit executed in {execution_time:.2f} ms")
+
+
+
     @ pytest.mark.asyncio
     async def test_network_reset(self):
         nano_nodes_path = Path("unit_tests/configs/nano_nodes")
@@ -147,3 +185,5 @@ class TestMockNetwork:
         assert keep_file_path.exists()
         assert not data_files
         assert not wallet_files
+
+
