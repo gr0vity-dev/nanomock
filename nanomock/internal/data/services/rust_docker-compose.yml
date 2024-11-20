@@ -6,7 +6,7 @@ services:
     image: nanocurrency/nano:V23.3
     user: "1000" #if your user is 1000 we can just run the container as is because because nano_docker_images use user 1000 too.
     container_name: ${default_docker}
-    command: node run --network=test
+    command: node run --network=test --data-path=/home/nanocurrency/NanoTest
     restart: unless-stopped
     ports:
       - 44100:17075
@@ -30,7 +30,7 @@ services:
         - TC_ENABLE=FALSE
     user: "123" #replaced with UID during "create" command
     container_name: ${default_docker}
-    command: node run --network=test
+    command: node run --network=test --data-path=/home/nanocurrency/NanoTest
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
@@ -49,7 +49,7 @@ services:
     image: nanocurrency/nano:V23.3
     #user: "1" #run without user
     container_name: ${default_docker}
-    command: node run --network=test
+    command: node run --network=test --data-path=/home/nanocurrency/NanoTest
     restart: unless-stopped
     ports:
       - 44100:17075
