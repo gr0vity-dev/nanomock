@@ -78,7 +78,6 @@ class ConfigReadWrite:
 
 
 class ConfigParser:
-
     preconfigured_peers = []
 
     def __init__(self, app_dir, config_file, logger=None):
@@ -89,36 +88,40 @@ class ConfigParser:
         self.conf_rw = ConfigReadWrite()
         self.nano_lib = NanoLibTools()
         self.config_dict = self.conf_rw.read_toml(self.nl_config_path)
-        self.compose_dict = self.conf_rw.read_yaml(self.default_compose_path,
-                                                   is_packaged=True)
+        self.compose_dict = self._get_compose_dict()
         self.__config_dict_add_genesis_to_nodes()
-        self.__config_dict_set_node_variables()  # modifies config_dict
-        self.__config_dict_set_default_values()  # modifies config_dict
+        self.__config_dict_set_node_variables()
+        self.__config_dict_set_default_values()
         self.__set_preconfigured_peers()
         self.__set_node_accounts()
         self.__set_balance_from_vote_weight()
         self.__set_special_account_data()
-        # self.__set_docker_compose()
+
+    def _get_compose_dict(self):
+        is_rust = os.getenv('NANO_IS_RUST', '').lower() in ('true', '1', 't')
+        if not is_rust:
+            is_rust = self.config_dict.get("is_rust", False)
+
+        compose_filename = "rust_docker-compose.yml" if is_rust else "default_docker-compose.yml"
+
+        if is_packaged_version():
+            compose_path = f"{self.services_dir}.{compose_filename}"
+        else:
+            compose_path = Path(self.services_dir) / compose_filename
+
+        return self.conf_rw.read_yaml(compose_path, is_packaged=is_packaged_version())
 
     def _set_path_variables(self, app_dir, config_file):
         user_app_dir = Path(app_dir).resolve()
 
         if is_packaged_version():
             self.services_dir = "nanomock.internal.data.services"
-            self.default_compose_path = f"{self.services_dir}.default_docker-compose.yml"
             self.default_nanomonitor_config = f"{self.services_dir}.nanomonitor.default_config.php"
             self.default_nanomonitor_config = f"{self.services_dir}.nanovotevisu.default_docker-compose.yml"
         else:
-            self.services_dir = Path().resolve(
-            ) / "app" / "internal" / "data" / "services"
-
-            self.default_compose_path = Path(
-                self.services_dir) / "default_docker-compose.yml"
-            self.default_nanomonitor_config = Path(
-                self.services_dir) / "nanomonitor" / "default_config.php"
-            self.default_nanovotevisu_config = Path(
-                self.services_dir
-            ) / "nanovotevisu" / "default_docker-compose.yml"
+            self.services_dir = Path().resolve() / "app" / "internal" / "data" / "services"
+            self.default_nanomonitor_config = Path(self.services_dir) / "nanomonitor" / "default_config.php"
+            self.default_nanovotevisu_config = Path(self.services_dir) / "nanovotevisu" / "default_docker-compose.yml"
 
         self.nl_config_path = user_app_dir / config_file
         self.nano_nodes_path = user_app_dir / "nano_nodes"
@@ -1063,7 +1066,7 @@ class ConfigParser:
 
         # '-l' needs to at the end of the command
         base_command = container['command'].replace(' -l', '')
-        full_command = f"{base_command} {' '.join(node_flags)} -l"
+        full_command = f"{base_command} {' '.join(node_flags)} "
         container['command'] = full_command
 
 

@@ -241,9 +241,9 @@ class TestConfigParser(unittest.TestCase):
             commands.append(service_config.get("command"))
 
         # Expected command after appending node_flags
-        expected_command_0 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 --flag_2 -l"
-        expected_command_1 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 -l"
-        expected_command_2 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_3 -l"
+        expected_command_0 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 --flag_2 "
+        expected_command_1 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_1 "
+        expected_command_2 = "nano_node daemon --network=test --data_path=/root/NanoTest --flag_3 "
 
 
         # Assert to check if the command in the container is as expected
