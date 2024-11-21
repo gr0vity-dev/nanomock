@@ -72,9 +72,7 @@ class ConfigReadWrite:
 
     def write_yaml(self, path, content):
         with open(path, 'w', encoding='utf-8') as f:
-            yaml.dump(json.loads(str(content).replace("'", '"')),
-                      f,
-                      default_flow_style=False)
+            yaml.dump(content, f, default_flow_style=False)
 
 
 class ConfigParser:
@@ -120,8 +118,10 @@ class ConfigParser:
             self.default_nanomonitor_config = f"{self.services_dir}.nanovotevisu.default_docker-compose.yml"
         else:
             self.services_dir = Path().resolve() / "app" / "internal" / "data" / "services"
-            self.default_nanomonitor_config = Path(self.services_dir) / "nanomonitor" / "default_config.php"
-            self.default_nanovotevisu_config = Path(self.services_dir) / "nanovotevisu" / "default_docker-compose.yml"
+            self.default_nanomonitor_config = Path(
+                self.services_dir) / "nanomonitor" / "default_config.php"
+            self.default_nanovotevisu_config = Path(
+                self.services_dir) / "nanovotevisu" / "default_docker-compose.yml"
 
         self.nl_config_path = user_app_dir / config_file
         self.nano_nodes_path = user_app_dir / "nano_nodes"
@@ -197,7 +197,7 @@ class ConfigParser:
             # Add ports for each node
             node["name"] = self.get_node_prefix() + node["name"]
 
-            if self.get_env() in ( "gcloud" , "beta" , "live" ):
+            if self.get_env() in ("gcloud", "beta", "live"):
                 host_port_inc = 0
 
             node["host_port_peer"] = self.config_dict["representatives"][
@@ -271,7 +271,6 @@ class ConfigParser:
         # traffic control
         self.config_dict.setdefault(
             "tc_enable", str2bool(self.config_dict.get("tc_enable", False)))
-
 
         # enablel ogging to file
         self.config_dict.setdefault(
@@ -375,7 +374,8 @@ class ConfigParser:
     def get_log_level(self, node_name):
         node_conf = self.get_node_config(node_name)
         if node_conf:
-            self.logger.info(f'Log level : {node_conf.get("log_level", "default")}')
+            self.logger.info(
+                f'Log level : {node_conf.get("log_level", "default")}')
             return node_conf.get("log_level", "info")
         raise ValueError(
             f"{node_name} undefined in {self.nl_config_path}\nValid names:{self.get_nodes_name()}"
@@ -453,7 +453,6 @@ class ConfigParser:
 
         return ctx
 
-
     def get_connected_peers(self, node_name=None):
         all_peers = self.preconfigured_peers
         node_conf = self.get_node_config(node_name)
@@ -525,12 +524,12 @@ class ConfigParser:
 
         elif env == "live":
             json_block = str({
-                "type":"open",
-                "source":"E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA",
-                "representative":"xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
-                "account":"xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
-                "work":"62f05417dd3fb691",
-                "signature":"9F0C933C8ADE004D808EA1985FA746A7E95BA2A38F867640F53EC8F180BDFE9E2C1268DEAD7C2664F356E37ABA362BC58E46DBA03E523A7B5A19E4B6EB12BB02"
+                "type": "open",
+                "source": "E89208DD038FBB269987689621D52292AE9C35941A7484756ECCED92A65093BA",
+                "representative": "xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
+                "account": "xrb_3t6k35gi95xu6tergt6p69ck76ogmitsa8mnijtpxm9fkcm736xtoncuohr3",
+                "work": "62f05417dd3fb691",
+                "signature": "9F0C933C8ADE004D808EA1985FA746A7E95BA2A38F867640F53EC8F180BDFE9E2C1268DEAD7C2664F356E37ABA362BC58E46DBA03E523A7B5A19E4B6EB12BB02"
             }).replace("'", '"')
         else:
             raise ValueError(
@@ -647,6 +646,8 @@ class ConfigParser:
             return []
 
         compose_config = self.conf_rw.read_yaml(self.compose_out_path)
+        if not compose_config:
+            return []
 
         return [service for service in compose_config["services"].keys()]
 
@@ -838,7 +839,8 @@ class ConfigParser:
         # Create 1 exporter per node
         for node in self.config_dict["representatives"]["nodes"]:
 
-            node_prom_enable = node.get("prom_enable", "true").lower() == "true"
+            node_prom_enable = node.get(
+                "prom_enable", "true").lower() == "true"
             if not node_prom_enable:
                 self.enabled_services.append(
                     f'Prometheus exporter disabled for node {node["name"]}'
@@ -1069,8 +1071,6 @@ class ConfigParser:
         full_command = f"{base_command} {' '.join(node_flags)} "
         container['command'] = full_command
 
-
-
     def enable_logging_to_file(self, container):
         if self.config_dict.get("filelog_enable", False):
             container['logging'] = {
@@ -1099,8 +1099,11 @@ class ConfigParser:
                 f'UID={user_id}',
             ]
 
+    def get_user_id(self):
+        return str(os.getuid())
+
     def compose_add_node(self, node_name):
-        user_id = str(os.getuid())
+        user_id = self.get_user_id()
         docker_tag = self.get_config_tag("docker_tag", node_name,
                                          "nanocurrency/nano-beta:latest")
 
