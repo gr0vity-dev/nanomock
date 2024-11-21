@@ -65,7 +65,7 @@ networks:
   nano-local:
     name: nano-local
     driver: bridge
-    external: 'true'
+    external: true
   
 volumes:
   nl_default_volume : {}
